@@ -1,7 +1,7 @@
 name: Deploy
 on:
   push:
-    branches: [main]
+    branches: [main, claude/practical-euler-PiM9i]
   workflow_dispatch:
 permissions:
   contents: read
