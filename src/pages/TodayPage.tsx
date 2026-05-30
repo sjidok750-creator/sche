@@ -80,7 +80,10 @@ export default function TodayPage({
 }) {
   const today = kstToday();
   const monthKey = currentMonthKey(today);
-  const sched = findMonth(data, monthKey);
+  // Prefer current month; fall back to nearest available month
+  const sched = findMonth(data, monthKey)
+    ?? (data.months.length > 0 ? data.months[data.months.length - 1] : null);
+  const activeMonthKey = sched?.month ?? monthKey;
   const [, mm, dd] = today.split("-");
 
   return (
@@ -92,11 +95,11 @@ export default function TodayPage({
             {mm}<span className="text-[var(--faint)]">.</span>{dd}
           </h1>
         </div>
-        <p className="eyebrow pb-1 tnum">{monthKey}</p>
+        <p className="eyebrow pb-1 tnum">{activeMonthKey}</p>
       </header>
 
       {sched ? (
-        <ScheduleView sched={sched} today={today} monthKey={monthKey} data={data} onDataUpdate={onDataUpdate} />
+        <ScheduleView sched={sched} today={today} monthKey={activeMonthKey} data={data} onDataUpdate={onDataUpdate} />
       ) : (
         <UploadFlow data={data} onDataUpdate={onDataUpdate} />
       )}
@@ -310,13 +313,6 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
   if (step === "analyzing") {
     const allDone = photos.every(p => p.status === "done" || p.status === "error");
     const hasError = photos.some(p => p.status === "error");
-    const allSuccess = allDone && !hasError;
-
-    // All success: close automatically after brief delay
-    if (allSuccess) {
-      setTimeout(() => { setPhotos([]); setStep("select"); }, 800);
-    }
-
     return (
       <div className="space-y-3">
         <div className="glass rounded-[24px] p-5 space-y-4">
@@ -332,12 +328,16 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
               </div>
             </div>
           ))}
-          {allDone && hasError && (
+          {allDone && (
             <button
               onClick={() => { setPhotos([]); setStep("select"); }}
-              className="w-full rounded-xl border border-white/10 py-2.5 text-sm font-semibold text-white/70 hover:bg-white/[0.04] transition"
+              className={`w-full rounded-xl py-2.5 text-sm font-semibold transition ${
+                hasError
+                  ? "border border-white/10 text-white/70 hover:bg-white/[0.04]"
+                  : "bg-sky-500/20 text-sky-200 hover:bg-sky-500/30"
+              }`}
             >
-              닫기
+              {hasError ? "닫기" : "확인"}
             </button>
           )}
         </div>
