@@ -12,12 +12,45 @@ JSON만 출력 — 코드펜스·설명 없이, 객체 하나만.
 - leg마다 block(비행시간, 분) 포함. 공항코드는 IATA 표준.
 - destination.city는 한국어, country는 ISO-2 코드.`;
 
-// Models tried in order; first success wins
-const MODELS = [
+// Preferred free vision models — tried in order
+const PREFERRED = [
+  "qwen/qwen2.5-vl-72b-instruct:free",
+  "qwen/qwen2-vl-7b-instruct:free",
   "google/gemini-2.0-flash-exp:free",
-  "google/gemini-flash-1.5-8b:free",
+  "google/gemini-2.0-flash-thinking-exp:free",
+  "meta-llama/llama-4-scout:free",
   "meta-llama/llama-4-maverick:free",
 ];
+
+interface ORModel {
+  id: string;
+  architecture?: { modality?: string };
+}
+
+let _freeVisionCache: string[] | null = null;
+
+async function getFreeVisionModels(apiKey: string): Promise<string[]> {
+  if (_freeVisionCache) return _freeVisionCache;
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` }
+    });
+    if (!res.ok) throw new Error("models list failed");
+    const body = await res.json() as { data: ORModel[] };
+    const vision = body.data
+      .filter(m => m.id.endsWith(":free") && /image|vision|multimodal/i.test(m.architecture?.modality ?? ""))
+      .map(m => m.id);
+    // preferred first, then any others
+    const sorted = [
+      ...PREFERRED.filter(id => vision.includes(id)),
+      ...vision.filter(id => !PREFERRED.includes(id))
+    ];
+    _freeVisionCache = sorted.length ? sorted : PREFERRED;
+  } catch {
+    _freeVisionCache = PREFERRED;
+  }
+  return _freeVisionCache;
+}
 
 async function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -29,10 +62,8 @@ async function fileToBase64(file: File): Promise<string> {
 }
 
 function extractJson(text: string): string {
-  // strip code fences (```json ... ```)
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenced) return fenced[1].trim();
-  // find first { ... } block
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start !== -1 && end !== -1 && end > start) return text.slice(start, end + 1);
@@ -76,7 +107,7 @@ async function tryModel(model: string, b64: string, mimeType: string, apiKey: st
   try {
     schedule = JSON.parse(jsonText) as Schedule;
   } catch {
-    throw new Error(`JSON 파싱 실패 — 모델 응답: ${text.slice(0, 120)}`);
+    throw new Error(`JSON 파싱 실패 — 응답: ${text.slice(0, 120)}`);
   }
   if (!schedule.month) throw new Error("month 필드 없음");
   return schedule;
@@ -85,9 +116,10 @@ async function tryModel(model: string, b64: string, mimeType: string, apiKey: st
 export async function analyzeImage(file: File, apiKey: string): Promise<Schedule> {
   const b64 = await fileToBase64(file);
   const mimeType = file.type || "image/jpeg";
+  const models = await getFreeVisionModels(apiKey);
 
   let lastError = "";
-  for (const model of MODELS) {
+  for (const model of models) {
     try {
       return await tryModel(model, b64, mimeType, apiKey);
     } catch (e) {
