@@ -240,7 +240,7 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
       Promise.all(
         items.map(item =>
           analyzeImage(item.file, key)
-            .then(s => ({ item, sched: s, error: null }))
+            .then(s => ({ item, sched: s, error: null as string | null }))
             .catch(e => ({ item, sched: null, error: e instanceof Error ? e.message : "분석 실패" }))
         )
       ).then(results => {
@@ -251,8 +251,7 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
         }));
         const ok = results.filter(r => r.sched).map(r => r.sched!);
         if (ok.length > 0) commitSchedules(ok, data);
-        setStep("select");
-        setTimeout(() => setPhotos([]), 2000);
+        // stay on analyzing step to show results; user closes manually
       });
     } else {
       setStep("prompt");
@@ -314,24 +313,36 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
   };
 
   /* ── 자동 분석 중 ── */
-  if (step === "analyzing") return (
-    <div className="space-y-3">
-      <div className="glass rounded-[24px] p-5 space-y-4">
-        <p className="eyebrow text-sky-400">AI 분석 중…</p>
-        {photos.map(p => (
-          <div key={p.id} className="flex items-center gap-3">
-            <img src={p.preview} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-white/15" />
-            <div className="flex-1 min-w-0">
-              <p className="truncate text-sm font-semibold text-[var(--ink)]">{p.file.name}</p>
-              {p.status === "analyzing" && <p className="text-xs text-sky-300 mt-0.5 animate-pulse">분석 중…</p>}
-              {p.status === "done" && <p className="text-xs text-emerald-400 mt-0.5">✓ 완료</p>}
-              {p.status === "error" && <p className="text-xs text-rose-400 mt-0.5 truncate">{p.error}</p>}
+  if (step === "analyzing") {
+    const allDone = photos.every(p => p.status === "done" || p.status === "error");
+    const hasError = photos.some(p => p.status === "error");
+    return (
+      <div className="space-y-3">
+        <div className="glass rounded-[24px] p-5 space-y-4">
+          <p className="eyebrow text-sky-400">{allDone ? (hasError ? "분석 완료 (일부 오류)" : "✓ 분석 완료") : "AI 분석 중…"}</p>
+          {photos.map(p => (
+            <div key={p.id} className="flex items-center gap-3">
+              <img src={p.preview} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-white/15" />
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-sm font-semibold text-[var(--ink)]">{p.file.name}</p>
+                {p.status === "analyzing" && <p className="text-xs text-sky-300 mt-0.5 animate-pulse">분석 중…</p>}
+                {p.status === "done" && <p className="text-xs text-emerald-400 mt-0.5">✓ 완료</p>}
+                {p.status === "error" && <p className="text-xs text-rose-400 mt-0.5">{p.error}</p>}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+          {allDone && (
+            <button
+              onClick={() => { setPhotos([]); setStep("select"); }}
+              className="w-full rounded-xl border border-white/10 py-2.5 text-sm font-semibold text-white/70 hover:bg-white/[0.04] transition"
+            >
+              닫기
+            </button>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   /* ── STEP 1: 사진 선택 ── */
   if (step === "select") return (
