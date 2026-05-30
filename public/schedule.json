@@ -1,0 +1,78 @@
+{
+  "month": "2026-06",
+  "crew": "경화",
+  "rev": "Rev.2",
+  "homeBase": "ICN",
+  "trips": [
+    {
+      "id": "MAD-0602",
+      "category": "long",
+      "region": "유럽",
+      "destination": { "code": "MAD", "city": "마드리드", "country": "ES" },
+      "start": "2026-06-02",
+      "end": "2026-06-05",
+      "days": 4,
+      "redeye": false,
+      "legs": [
+        { "dir": "out", "date": "2026-06-02", "flight": "KE0913", "from": "ICN", "to": "MAD", "dep": "09:55", "arr": "18:00", "arrDate": "2026-06-02", "redeye": false },
+        { "dir": "in", "date": "2026-06-04", "flight": "KE0914", "from": "MAD", "to": "ICN", "dep": "20:20", "arr": "16:00", "arrDate": "2026-06-05", "redeye": false }
+      ],
+      "layover": { "city": "마드리드", "nights": 2, "from": "2026-06-02", "to": "2026-06-04" }
+    },
+    {
+      "id": "BKK-0610",
+      "category": "mid",
+      "region": "동남아",
+      "destination": { "code": "BKK", "city": "방콕", "country": "TH" },
+      "start": "2026-06-10",
+      "end": "2026-06-12",
+      "days": 3,
+      "redeye": true,
+      "legs": [
+        { "dir": "out", "date": "2026-06-10", "flight": "KE0651", "from": "ICN", "to": "BKK", "dep": "17:25", "arr": "21:15", "arrDate": "2026-06-10", "redeye": false },
+        { "dir": "in", "date": "2026-06-11", "flight": "KE0652", "from": "BKK", "to": "ICN", "dep": "23:20", "arr": "06:50", "arrDate": "2026-06-12", "redeye": true }
+      ],
+      "layover": { "city": "방콕", "nights": 1, "from": "2026-06-10", "to": "2026-06-11" }
+    },
+    {
+      "id": "NRT-0618",
+      "category": "short",
+      "region": "일본",
+      "destination": { "code": "NRT", "city": "도쿄", "country": "JP" },
+      "start": "2026-06-18",
+      "end": "2026-06-18",
+      "days": 1,
+      "redeye": false,
+      "legs": [
+        { "dir": "out", "date": "2026-06-18", "flight": "KE0703", "from": "ICN", "to": "NRT", "dep": "09:00", "arr": "11:25", "arrDate": "2026-06-18", "redeye": false },
+        { "dir": "in", "date": "2026-06-18", "flight": "KE0706", "from": "NRT", "to": "ICN", "dep": "13:40", "arr": "16:25", "arrDate": "2026-06-18", "redeye": false }
+      ]
+    },
+    {
+      "id": "CJU-0622",
+      "category": "domestic",
+      "region": "국내",
+      "destination": { "code": "CJU", "city": "제주", "country": "KR" },
+      "start": "2026-06-22",
+      "end": "2026-06-22",
+      "days": 1,
+      "redeye": false,
+      "legs": [
+        { "dir": "out", "date": "2026-06-22", "flight": "KE1207", "from": "GMP", "to": "CJU", "dep": "08:00", "arr": "09:10", "arrDate": "2026-06-22", "redeye": false },
+        { "dir": "in", "date": "2026-06-22", "flight": "KE1216", "from": "CJU", "to": "GMP", "dep": "19:30", "arr": "20:40", "arrDate": "2026-06-22", "redeye": false }
+      ]
+    }
+  ],
+  "offDays": [
+    { "date": "2026-06-01", "code": "ADO" },
+    { "date": "2026-06-06", "code": "ATDO" },
+    { "date": "2026-06-07", "code": "OFF" },
+    { "date": "2026-06-14", "code": "PDO" },
+    { "date": "2026-06-15", "code": "OFF" },
+    { "date": "2026-06-28", "code": "OFF" },
+    { "date": "2026-06-29", "code": "OFF" }
+  ],
+  "education": [
+    { "date": "2026-06-25", "from": "08:30", "to": "17:30", "place": "ICN" }
+  ]
+}
