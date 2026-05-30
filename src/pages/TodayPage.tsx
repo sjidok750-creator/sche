@@ -15,10 +15,12 @@ import {
   findMonth,
   fmtDuration,
   kstToday,
+  monthKeys,
   monthSummary,
   nextUpcoming,
   reportingTime,
-  resolveToday
+  resolveToday,
+  shiftMonth
 } from "../lib/schedule";
 import { Settings } from "../lib/settings";
 import { analyzeImage } from "../lib/analyze";
@@ -216,6 +218,7 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
 
   const years = Array.from({ length: 3 }, (_, i) => now.getFullYear() - 1 + i);
   const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
+  const registered = monthKeys(data);
 
   /* ── 분석 중 / 완료 ── */
   if (step === "analyzing" || step === "done") {
@@ -231,19 +234,27 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-[var(--ink)]">{monthKey.replace("-", ".")} 스케줄</p>
               {step === "analyzing" && <p className="mt-0.5 text-xs text-sky-300 animate-pulse">AI가 사진을 읽고 있어요…</p>}
-              {ok && <p className="mt-0.5 text-xs text-emerald-400">앱에 반영됐어요</p>}
+              {ok && <p className="mt-0.5 text-xs text-emerald-400">앱에 반영됐어요 · 다른 달도 이어서 올릴 수 있어요</p>}
               {errMsg && <p className="mt-0.5 break-words text-xs text-rose-400">{errMsg}</p>}
             </div>
           </div>
           {pushErr && <p className="text-xs text-amber-400">GitHub 저장 실패: {pushErr} (앱에는 반영됨)</p>}
           {step === "done" && (
             <button
-              onClick={() => { setStep("select"); setPreview(""); setErrMsg(""); }}
+              onClick={() => {
+                if (ok) {
+                  // 다음 달로 자동 이동시켜 이어서 올리기 편하게
+                  const next = shiftMonth(monthKey, 1);
+                  const [ny, nm] = next.split("-");
+                  setYear(ny); setMonth(nm);
+                }
+                setStep("select"); setPreview(""); setErrMsg("");
+              }}
               className={`w-full rounded-xl py-2.5 text-sm font-semibold transition ${
                 ok ? "bg-sky-500/20 text-sky-200 hover:bg-sky-500/30" : "border border-white/10 text-white/70 hover:bg-white/[0.04]"
               }`}
             >
-              {ok ? "확인" : "다시 시도"}
+              {ok ? "다른 달도 올리기 →" : "다시 시도"}
             </button>
           )}
         </div>
@@ -259,6 +270,12 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
           <p className="text-sm font-semibold text-amber-300">먼저 API 키가 필요해요</p>
           <Link to="/help" className="mt-1 inline-block text-xs text-sky-400 hover:text-sky-200">설정 → AI 자동 분석에서 입력 →</Link>
         </div>
+      )}
+
+      {registered.length > 0 && (
+        <p className="px-1 text-xs text-[var(--muted)]">
+          등록된 달: {registered.map(k => k.replace("-", ".")).join(", ")}
+        </p>
       )}
 
       <div className="glass rounded-[24px] p-5 space-y-4">
@@ -292,7 +309,7 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
         {!compact && (
           <div className="text-center">
             <p className="font-display text-lg font-bold tracking-tight">{monthKey.replace("-", ".")} 사진 올리기</p>
-            <p className="mt-1 text-sm text-[var(--muted)]">한 달에 한 장씩 올려주세요</p>
+            <p className="mt-1 text-sm text-[var(--muted)]">한 장씩 올려요 · 여러 달은 반복해서 추가</p>
           </div>
         )}
         <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-5 py-2 text-sm font-semibold text-sky-300">
