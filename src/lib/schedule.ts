@@ -1,4 +1,42 @@
-import type { Schedule, TodayStatus, Category, Leg } from "../types";
+import type {
+  Schedule,
+  TodayStatus,
+  Category,
+  Leg,
+  RosterData
+} from "../types";
+
+/** 등록된 달 목록(YYYY-MM)을 오름차순으로 */
+export function monthKeys(data: RosterData): string[] {
+  return (data.months || [])
+    .map((m) => m.month)
+    .filter(Boolean)
+    .sort();
+}
+
+export function findMonth(
+  data: RosterData,
+  monthKey: string
+): Schedule | undefined {
+  return (data.months || []).find((m) => m.month === monthKey);
+}
+
+/** 오늘이 속한 달 키(YYYY-MM) */
+export function currentMonthKey(today: string): string {
+  return today.slice(0, 7);
+}
+
+/** monthKey 기준 이전/다음 달 키 */
+export function shiftMonth(monthKey: string, delta: number): string {
+  const [y, m] = monthKey.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export function monthLabel(monthKey: string): { year: string; mon: string } {
+  const [y, m] = monthKey.split("-");
+  return { year: y, mon: m };
+}
 
 /** 오늘 날짜를 Asia/Seoul 기준 YYYY-MM-DD 로 반환 */
 export function kstToday(now: Date = new Date()): string {

@@ -1,0 +1,96 @@
+{
+  "months": [
+    {
+      "month": "2026-05",
+      "homeBase": "ICN",
+      "trips": [
+        {
+          "id": "JFK-0520",
+          "category": "long",
+          "region": "미주",
+          "destination": { "code": "JFK", "city": "뉴욕", "country": "US" },
+          "start": "2026-05-20",
+          "end": "2026-05-24",
+          "days": 5,
+          "redeye": false,
+          "legs": [
+            { "dir": "out", "date": "2026-05-20", "flight": "KE0081", "from": "ICN", "to": "JFK", "dep": "10:00", "arr": "11:25", "arrDate": "2026-05-20", "redeye": false },
+            { "dir": "in", "date": "2026-05-23", "flight": "KE0082", "from": "JFK", "to": "ICN", "dep": "13:00", "arr": "17:25", "arrDate": "2026-05-24", "redeye": false }
+          ],
+          "layover": { "city": "뉴욕", "nights": 3, "from": "2026-05-20", "to": "2026-05-23" }
+        }
+      ],
+      "offDays": [
+        { "date": "2026-05-25", "code": "OFF" },
+        { "date": "2026-05-26", "code": "OFF" }
+      ],
+      "education": []
+    },
+    {
+      "month": "2026-06",
+      "homeBase": "ICN",
+      "trips": [
+        {
+          "id": "MAD-0602",
+          "category": "long",
+          "region": "유럽",
+          "destination": { "code": "MAD", "city": "마드리드", "country": "ES" },
+          "start": "2026-06-02",
+          "end": "2026-06-05",
+          "days": 4,
+          "redeye": false,
+          "legs": [
+            { "dir": "out", "date": "2026-06-02", "flight": "KE0913", "from": "ICN", "to": "MAD", "dep": "09:55", "arr": "18:00", "arrDate": "2026-06-02", "redeye": false },
+            { "dir": "in", "date": "2026-06-04", "flight": "KE0914", "from": "MAD", "to": "ICN", "dep": "20:20", "arr": "16:00", "arrDate": "2026-06-05", "redeye": false }
+          ],
+          "layover": { "city": "마드리드", "nights": 2, "from": "2026-06-02", "to": "2026-06-04" }
+        },
+        {
+          "id": "BKK-0610",
+          "category": "mid",
+          "region": "동남아",
+          "destination": { "code": "BKK", "city": "방콕", "country": "TH" },
+          "start": "2026-06-10",
+          "end": "2026-06-12",
+          "days": 3,
+          "redeye": true,
+          "legs": [
+            { "dir": "out", "date": "2026-06-10", "flight": "KE0651", "from": "ICN", "to": "BKK", "dep": "17:25", "arr": "21:15", "arrDate": "2026-06-10", "redeye": false },
+            { "dir": "in", "date": "2026-06-11", "flight": "KE0652", "from": "BKK", "to": "ICN", "dep": "23:20", "arr": "06:50", "arrDate": "2026-06-12", "redeye": true }
+          ],
+          "layover": { "city": "방콕", "nights": 1, "from": "2026-06-10", "to": "2026-06-11" }
+        }
+      ],
+      "offDays": [
+        { "date": "2026-06-01", "code": "ADO" },
+        { "date": "2026-06-25", "code": "OFF" }
+      ],
+      "education": [
+        { "date": "2026-06-18", "from": "08:30", "to": "17:30", "place": "ICN" }
+      ]
+    },
+    {
+      "month": "2026-07",
+      "homeBase": "ICN",
+      "trips": [
+        {
+          "id": "CDG-0705",
+          "category": "long",
+          "region": "유럽",
+          "destination": { "code": "CDG", "city": "파리", "country": "FR" },
+          "start": "2026-07-05",
+          "end": "2026-07-09",
+          "days": 5,
+          "redeye": false,
+          "legs": [
+            { "dir": "out", "date": "2026-07-05", "flight": "KE0901", "from": "ICN", "to": "CDG", "dep": "13:10", "arr": "18:30", "arrDate": "2026-07-05", "redeye": false },
+            { "dir": "in", "date": "2026-07-08", "flight": "KE0902", "from": "CDG", "to": "ICN", "dep": "20:30", "arr": "15:30", "arrDate": "2026-07-09", "redeye": false }
+          ],
+          "layover": { "city": "파리", "nights": 3, "from": "2026-07-05", "to": "2026-07-08" }
+        }
+      ],
+      "offDays": [{ "date": "2026-07-01", "code": "OFF" }],
+      "education": []
+    }
+  ]
+}

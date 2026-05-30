@@ -4,6 +4,16 @@
 
 :root {
   color-scheme: dark;
+  --bg: #05070f;
+  --ink: #eef2fb;
+  --muted: #8b97b4;
+  --faint: #5b657f;
+  --line: rgba(255, 255, 255, 0.08);
+  --glass: rgba(255, 255, 255, 0.035);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -14,15 +24,115 @@ body,
 
 body {
   margin: 0;
-  background: #050f24;
-  color: #e8eef7;
+  color: var(--ink);
   font-family: "Pretendard", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  background: var(--bg);
+}
+
+/* ── 분위기: 오로라 글로우 + 미세 그레인 (고정 배경) ── */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora::before,
+.aurora::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.55;
+}
+.aurora::before {
+  width: 460px;
+  height: 460px;
+  top: -160px;
+  left: -120px;
+  background: radial-gradient(circle at 30% 30%, #1b3a8a, transparent 70%);
+}
+.aurora::after {
+  width: 520px;
+  height: 520px;
+  bottom: -220px;
+  right: -160px;
+  background: radial-gradient(circle at 70% 70%, #0e5b6e, transparent 70%);
+}
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── 글래스 카드 ── */
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 20px 40px -24px rgba(0, 0, 0, 0.8);
+}
+
+.hairline {
+  border-color: var(--line);
+}
+
+/* 라벨: 작은 대문자 + 자간 */
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--faint);
+  font-weight: 600;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
 }
 
 .safe-bottom {
-  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 .safe-top {
-  padding-top: max(0.5rem, env(safe-area-inset-top));
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.rise-1 {
+  animation-delay: 0.04s;
+}
+.rise-2 {
+  animation-delay: 0.1s;
+}
+.rise-3 {
+  animation-delay: 0.16s;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }

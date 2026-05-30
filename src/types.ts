@@ -60,6 +60,11 @@ export interface Schedule {
   education: Education[];
 }
 
+/** 단일 소스: 여러 달을 담는다. 사진을 올릴 때마다 한 달씩 쌓인다. */
+export interface RosterData {
+  months: Schedule[];
+}
+
 export type TodayKind =
   | "flight-out"
   | "flight-in"
