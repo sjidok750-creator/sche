@@ -143,8 +143,10 @@ function postProcess(sched: Schedule, yearMonth: string): Schedule {
     const inLeg = legs.find(l => l.dir === "in");
     let layover = t.layover;
     if (!layover && outLeg && inLeg && category !== "domestic") {
+      // 도착일(out leg arrDate) ~ 귀국 출발일(in leg date) 차이 = 실제 숙박 박수
+      const arrivedDay = outLeg.arrDate || outLeg.date;
       const nights = Math.round(
-        (new Date(`${inLeg.date}T00:00:00Z`).getTime() - new Date(`${outLeg.date}T00:00:00Z`).getTime()) / 86400000
+        (new Date(`${inLeg.date}T00:00:00Z`).getTime() - new Date(`${arrivedDay}T00:00:00Z`).getTime()) / 86400000
       );
       if (nights >= 1) {
         layover = {
