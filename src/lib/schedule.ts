@@ -206,7 +206,8 @@ export function monthSummary(data: Schedule): MonthSummary {
   let layoverNights = 0;
   let blockMinutes = 0;
   for (const t of data.trips || []) {
-    flights += (t.legs || []).filter((l) => l.flight).length;
+    // 편명이 null이어도 출/도착지가 있으면 비행 leg로 집계
+    flights += (t.legs || []).filter((l) => l.flight || l.from || l.to).length;
     if (t.layover) layoverNights += t.layover.nights;
     for (const l of t.legs || []) blockMinutes += l.block ?? 0;
   }
@@ -249,7 +250,7 @@ export function monthRhythm(data: Schedule): RhythmDay[] {
     else {
       for (const t of data.trips || []) {
         const onLeg = (t.legs || []).some(
-          (l: Leg) => l.date === date && l.flight
+          (l: Leg) => l.date === date
         );
         if (onLeg) {
           kind = "flight";
