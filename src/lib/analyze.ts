@@ -12,6 +12,13 @@ JSON만 출력 — 코드펜스·설명 없이, 객체 하나만.
 - leg마다 block(비행시간, 분) 포함. 공항코드는 IATA 표준.
 - destination.city는 한국어, country는 ISO-2 코드.`;
 
+// Models tried in order; first success wins
+const MODELS = [
+  "google/gemini-2.0-flash-exp:free",
+  "google/gemini-flash-1.5-8b:free",
+  "meta-llama/llama-4-maverick:free",
+];
+
 async function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -21,10 +28,18 @@ async function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export async function analyzeImage(file: File, apiKey: string): Promise<Schedule> {
-  const b64 = await fileToBase64(file);
-  const mimeType = file.type || "image/jpeg";
+function extractJson(text: string): string {
+  // strip code fences (```json ... ```)
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenced) return fenced[1].trim();
+  // find first { ... } block
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start !== -1 && end !== -1 && end > start) return text.slice(start, end + 1);
+  return text.trim();
+}
 
+async function tryModel(model: string, b64: string, mimeType: string, apiKey: string): Promise<Schedule> {
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -34,7 +49,7 @@ export async function analyzeImage(file: File, apiKey: string): Promise<Schedule
       "X-Title": "Flight Roster PWA"
     },
     body: JSON.stringify({
-      model: "meta-llama/llama-4-maverick:free",
+      model,
       messages: [
         {
           role: "user",
@@ -49,14 +64,35 @@ export async function analyzeImage(file: File, apiKey: string): Promise<Schedule
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
-    throw new Error(err.error?.message ?? `OpenRouter API ${res.status}`);
+    throw new Error(err.error?.message ?? `HTTP ${res.status}`);
   }
 
   const body = await res.json() as { choices: { message: { content: string } }[] };
   const text = body.choices?.[0]?.message?.content ?? "";
+  if (!text) throw new Error("빈 응답");
 
-  const jsonText = text.replace(/^```[a-z]*\n?/m, "").replace(/\n?```$/m, "").trim();
-  const schedule = JSON.parse(jsonText) as Schedule;
+  const jsonText = extractJson(text);
+  let schedule: Schedule;
+  try {
+    schedule = JSON.parse(jsonText) as Schedule;
+  } catch {
+    throw new Error(`JSON 파싱 실패 — 모델 응답: ${text.slice(0, 120)}`);
+  }
   if (!schedule.month) throw new Error("month 필드 없음");
   return schedule;
+}
+
+export async function analyzeImage(file: File, apiKey: string): Promise<Schedule> {
+  const b64 = await fileToBase64(file);
+  const mimeType = file.type || "image/jpeg";
+
+  let lastError = "";
+  for (const model of MODELS) {
+    try {
+      return await tryModel(model, b64, mimeType, apiKey);
+    } catch (e) {
+      lastError = `[${model}] ${e instanceof Error ? e.message : e}`;
+    }
+  }
+  throw new Error(lastError);
 }
