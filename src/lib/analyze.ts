@@ -1,16 +1,121 @@
-import type { Schedule } from "../types";
+import type { Schedule, Trip, Category } from "../types";
 
-const PROMPT = `이 승무원 월간 스케줄 캘린더를 schedule.json 의 months 배열 한 객체로 변환해줘.
-JSON만 출력 — 코드펜스·설명 없이, 객체 하나만.
+// ── 카테고리 자동 보정용 공항→카테고리 매핑 ──
+const LONG_HAUL = new Set(["JFK","LAX","ORD","ATL","DFW","SFO","IAD","IAH","SEA","BOS","MIA","YYZ","YVR","MEX","GRU","EZE","LHR","CDG","AMS","FRA","MUC","ZRH","VIE","MAD","BCN","FCO","MXP","IST","SVO","DOH","DXB","AUH","KWI","BKR","CAI","JNB","SYD","MEL","BNE","AKL","PER"]);
+const MID_HAUL  = new Set(["BKK","DMK","HKT","KUL","SIN","CGK","SUB","MNL","CEB","SGN","HAN","DAD","RGN","CMB","DEL","BOM","HYD","MAA","CCU","KTM","DAC","ISB","KHI","LHE","TAS","ALA","MCT","BAH","AMM","BEY","TLV","ADD","NBO","DAR"]);
+const SHORT_HAUL = new Set(["NRT","HND","KIX","NGO","FUK","CTS","OKA","PUS","TAO","PEK","PKX","SHA","PVG","CAN","CTU","XIY","HGH","TSN","XMN","CSX","CGO","WUH","KHN","NKG","TNA","HAK","SZX","URC","GUM","SPN","ROR","HNL","OGN"]);
+
+function inferCategory(to: string): Category {
+  const code = (to || "").toUpperCase();
+  if (LONG_HAUL.has(code)) return "long";
+  if (MID_HAUL.has(code))  return "mid";
+  if (SHORT_HAUL.has(code)) return "short";
+  // 국내 공항
+  if (["GMP","ICN","CJU","PUS","USN","TAE","CJJ","KWJ","WJU","YNY","RSU","HIN","MPK","KAG"].includes(code)) return "domestic";
+  return "short"; // 기본값
+}
+
+function buildPrompt(yearMonth: string): string {
+  const [y, m] = yearMonth.split("-");
+  return `이 이미지는 ${y}년 ${m}월 항공사 승무원 스케줄 캘린더다.
+아래 JSON 스키마의 객체 하나를 출력해라. JSON만 출력 — 코드펜스·설명·주석 없이.
+
+필수 스키마:
+{
+  "month": "${yearMonth}",
+  "trips": [
+    {
+      "id": "t1",
+      "category": "long|mid|short|domestic",
+      "destination": { "code": "IATA 3글자", "city": "한국어 도시명", "country": "ISO-2" },
+      "start": "YYYY-MM-DD",
+      "end": "YYYY-MM-DD",
+      "days": 일수(정수),
+      "legs": [
+        {
+          "dir": "out",
+          "date": "YYYY-MM-DD",
+          "flight": "KE1234 또는 null",
+          "from": "ICN",
+          "to": "목적지IATA",
+          "dep": "HH:MM",
+          "arr": "HH:MM",
+          "arrDate": "YYYY-MM-DD",
+          "redeye": false,
+          "block": 분(정수)
+        }
+      ]
+    }
+  ],
+  "offDays": [{ "date": "YYYY-MM-DD", "code": "ADO|ATDO|PDO|휴무" }],
+  "education": [{ "date": "YYYY-MM-DD", "from": "HH:MM", "to": "HH:MM", "place": "장소" }]
+}
+
 규칙:
-- 이미지 상단에서 연월(YYYY-MM)을 읽어 month 필드에 넣는다.
-- 비행 블록 날짜 칸 기준으로 date/arrDate 채움. 다음 칸 넘어가면 arrDate=+1일.
-- 빈 칸(아무 표시 없음)은 대기 — trips/offDays/education 어디에도 넣지 않음.
-- 국내선(GMP·CJU·PUS·USN·TAE 등)=domestic, EDU=education, ADO/ATDO/PDO/휴무=offDays.
-- 국제선: long(미주·유럽·대양주)/mid(동남아·중동)/short(일본·중국·괌).
-- 출발 21:00 이후면 redeye:true. 편명 KExxxx 유지, 불명확하면 null.
-- leg마다 block(비행시간, 분) 포함. 공항코드는 IATA 표준.
-- destination.city는 한국어, country는 ISO-2 코드.`;
+1. 모든 날짜는 반드시 YYYY-MM-DD 전체 형식 — "${y}-${m}-01" 처럼.
+2. category: domestic=국내선(GMP/CJU/PUS/USN/TAE), long=미주·유럽·대양주, mid=동남아·중동·남아시아, short=일본·중국·괌·하와이
+3. 레이오버 구간: 출발 leg dir="out", 귀국 leg dir="in". 두 leg 사이 날짜는 trip의 start~end에 포함.
+4. 다음날 도착이면 arrDate = 출발일+1일.
+5. 출발 21:00 이후면 redeye=true.
+6. 빈 칸(표시 없음)은 대기 — trips/offDays/education에 넣지 않음.
+7. EDU = education. ADO/ATDO/PDO/PDO/휴무 = offDays.
+8. block(분)은 이미지에 표시된 시간 또는 도착-출발 시차 계산. 모르면 0.
+9. trip마다 id는 "t1","t2"... 순서대로.`;
+}
+
+// ── 파싱 후 자동 보정 ──
+function postProcess(sched: Schedule, yearMonth: string): Schedule {
+  const [y, m] = yearMonth.split("-");
+  const prefix = `${y}-${m}`;
+
+  // 날짜 형식 보정: MM-DD → YYYY-MM-DD
+  function fixDate(d: string | undefined | null): string {
+    if (!d) return `${prefix}-01`;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    if (/^\d{2}-\d{2}$/.test(d)) return `${y}-${d}`;
+    if (/^\d{1,2}$/.test(d)) return `${prefix}-${d.padStart(2, "0")}`;
+    return d;
+  }
+
+  const trips: Trip[] = (sched.trips || []).map((t, i) => {
+    const legs = (t.legs || []).map(l => ({
+      ...l,
+      date: fixDate(l.date),
+      arrDate: fixDate(l.arrDate) || fixDate(l.date),
+      from: (l.from || "ICN").toUpperCase(),
+      to:   (l.to || "").toUpperCase(),
+    }));
+
+    // 카테고리 자동 보정
+    const destCode = (t.destination?.code || legs.find(l => l.dir === "out")?.to || "").toUpperCase();
+    const category = inferCategory(destCode) ;
+
+    // start/end 보정
+    const dates = legs.map(l => l.date).filter(Boolean).sort();
+    const start = fixDate(t.start) || dates[0] || `${prefix}-01`;
+    const end   = fixDate(t.end)   || dates[dates.length - 1] || start;
+
+    return {
+      ...t,
+      id: t.id || `t${i + 1}`,
+      category,
+      start,
+      end,
+      days: t.days || Math.max(1, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000) + 1),
+      legs,
+      destination: {
+        code:    (t.destination?.code || destCode || "—").toUpperCase(),
+        city:    t.destination?.city || "",
+        country: t.destination?.country || "",
+      }
+    };
+  });
+
+  const offDays = (sched.offDays || []).map(o => ({ ...o, date: fixDate(o.date) }));
+  const education = (sched.education || []).map(e => ({ ...e, date: fixDate(e.date) }));
+
+  return { ...sched, month: yearMonth, trips, offDays, education };
+}
 
 async function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -30,7 +135,7 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-export async function analyzeImage(file: File, apiKey: string): Promise<Schedule> {
+export async function analyzeImage(file: File, apiKey: string, yearMonth: string): Promise<Schedule> {
   const b64 = await fileToBase64(file);
   const mimeType = (file.type || "image/jpeg") as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
@@ -44,13 +149,13 @@ export async function analyzeImage(file: File, apiKey: string): Promise<Schedule
     },
     body: JSON.stringify({
       model: "claude-opus-4-5",
-      max_tokens: 4096,
+      max_tokens: 8192,
       messages: [
         {
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: mimeType, data: b64 } },
-            { type: "text", text: PROMPT }
+            { type: "text", text: buildPrompt(yearMonth) }
           ]
         }
       ]
@@ -71,8 +176,9 @@ export async function analyzeImage(file: File, apiKey: string): Promise<Schedule
   try {
     schedule = JSON.parse(jsonText) as Schedule;
   } catch {
-    throw new Error(`JSON 파싱 실패 — 응답: ${text.slice(0, 120)}`);
+    throw new Error(`JSON 파싱 실패 — 응답: ${text.slice(0, 200)}`);
   }
   if (!schedule.month) throw new Error("month 필드 없음");
-  return schedule;
+
+  return postProcess(schedule, yearMonth);
 }

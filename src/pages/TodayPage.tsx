@@ -200,7 +200,7 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
     setStep("analyzing");
     setErrMsg(""); setPushErr("");
     try {
-      const sched = await analyzeImage(file, Settings.anthropicKey);
+      const sched = await analyzeImage(file, Settings.anthropicKey, monthKey);
       // 사용자가 지정한 연/월로 강제 — AI 오독 방지
       sched.month = monthKey;
       const updated = mergeMonth(data, sched);
