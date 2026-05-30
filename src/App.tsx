@@ -1,9 +1,11 @@
-import { NavLink, Route, Routes, Navigate } from "react-router-dom";
+import { useRef } from "react";
+import { NavLink, Route, Routes, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { useSchedule } from "./lib/useSchedule";
 
 import TodayPage from "./pages/TodayPage";
 import MonthPage from "./pages/MonthPage";
 import HelpPage from "./pages/HelpPage";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { CalendarIcon, HelpIcon, TodayDot } from "./components/icons";
 
 const tabs = [
@@ -12,8 +14,33 @@ const tabs = [
   { to: "/help", label: "설정", Icon: HelpIcon }
 ];
 
+const ORDER = ["/today", "/month", "/help"];
+
 export default function App() {
   const [state, updateSchedule] = useSchedule();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const touch = useRef<{ x: number; y: number } | null>(null);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touch.current = { x: t.clientX, y: t.clientY };
+  };
+
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (!touch.current) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touch.current.x;
+    const dy = t.clientY - touch.current.y;
+    touch.current = null;
+    // horizontal swipe only
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+
+    const cur = ORDER.findIndex(p => location.pathname.startsWith(p));
+    const idx = cur === -1 ? 0 : cur;
+    const next = dx < 0 ? idx + 1 : idx - 1;
+    if (next >= 0 && next < ORDER.length) navigate(ORDER[next]);
+  };
 
   return (
     <>
@@ -21,7 +48,11 @@ export default function App() {
       <div className="grain" />
 
       <div className="mx-auto flex min-h-screen max-w-md flex-col">
-        <main className="safe-top flex-1 px-5 pb-32 pt-4">
+        <main
+          className="safe-top flex-1 px-5 pb-32 pt-4"
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
           {state.status === "loading" && <Skeleton />}
           {state.status === "error" && (
             <div className="grid h-[60vh] place-items-center px-6 text-center">
@@ -32,21 +63,23 @@ export default function App() {
             </div>
           )}
           {state.status === "ok" && (
-            <Routes>
-              <Route path="/" element={<Navigate to="/today" replace />} />
-              <Route
-                path="/today"
-                element={
-                  <TodayPage
-                    data={state.data}
-                    onDataUpdate={updateSchedule}
-                  />
-                }
-              />
-              <Route path="/month" element={<MonthPage data={state.data} />} />
-              <Route path="/help" element={<HelpPage data={state.data} />} />
-              <Route path="*" element={<Navigate to="/today" replace />} />
-            </Routes>
+            <ErrorBoundary key={location.pathname}>
+              <Routes>
+                <Route path="/" element={<Navigate to="/today" replace />} />
+                <Route
+                  path="/today"
+                  element={
+                    <TodayPage
+                      data={state.data}
+                      onDataUpdate={updateSchedule}
+                    />
+                  }
+                />
+                <Route path="/month" element={<MonthPage data={state.data} />} />
+                <Route path="/help" element={<HelpPage data={state.data} />} />
+                <Route path="*" element={<Navigate to="/today" replace />} />
+              </Routes>
+            </ErrorBoundary>
           )}
         </main>
 

@@ -187,6 +187,11 @@ export const CATEGORY_META: Record<
   }
 };
 
+/** 잘못된 category 값이 와도 안전하게 메타 반환 */
+export function categoryMeta(category: Category | string | undefined) {
+  return CATEGORY_META[category as Category] ?? CATEGORY_META.domestic;
+}
+
 export interface MonthSummary {
   trips: number;
   flights: number;

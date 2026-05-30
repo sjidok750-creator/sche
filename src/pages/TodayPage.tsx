@@ -8,7 +8,7 @@ import {
 import { Link } from "react-router-dom";
 import type { RosterData, Schedule } from "../types";
 import {
-  CATEGORY_META,
+  categoryMeta,
   currentMonthKey,
   dateAtKst,
   ddayLabel,
@@ -486,11 +486,11 @@ function HeroCard({ status, today, clock }: {
 }) {
   if (status.kind === "flight-out" || status.kind === "flight-in") return <FlightHero status={status} today={today} clock={clock} />;
   if (status.kind === "layover") {
-    const trip = status.trip!; const meta = CATEGORY_META[trip.category];
+    const trip = status.trip!; const meta = categoryMeta(trip.category);
     return (
       <StateHero accent={meta.accent} icon={<HotelIcon size={26} />} eyebrow="레이오버">
-        <h2 className="font-display text-3xl font-extrabold tracking-tight">{trip.layover?.city ?? trip.destination.city}</h2>
-        <p className="mt-1.5 font-mono text-sm text-[var(--muted)]">{trip.destination.code} · {trip.destination.country}{trip.layover && ` · ${trip.layover.nights}박`}</p>
+        <h2 className="font-display text-3xl font-extrabold tracking-tight">{trip.layover?.city ?? trip.destination?.city ?? ""}</h2>
+        <p className="mt-1.5 font-mono text-sm text-[var(--muted)]">{trip.destination?.code ?? "—"} · {trip.destination?.country ?? ""}{trip.layover && ` · ${trip.layover.nights}박`}</p>
       </StateHero>
     );
   }
@@ -541,7 +541,7 @@ function StateHero({ accent, icon, eyebrow, children }: { accent: string; icon: 
 
 function FlightHero({ status, today, clock }: { status: ReturnType<typeof resolveToday>; today: string; clock: ReturnType<typeof useClock>; }) {
   const trip = status.trip!; const leg = status.leg!;
-  const meta = CATEGORY_META[trip.category];
+  const meta = categoryMeta(trip.category);
   const reporting = reportingTime(leg.dep);
   const dirLabel = leg.dir === "out" ? "출발" : "복귀";
   const plus1 = leg.arrDate && leg.arrDate !== leg.date;
@@ -579,7 +579,7 @@ function FlightHero({ status, today, clock }: { status: ReturnType<typeof resolv
           </div>
         </div>
         <p className="mt-4 flex items-center gap-2 text-sm text-[var(--muted)]">
-          {trip.destination.city}
+          {trip.destination?.city ?? ""}
           {leg.redeye && <span className="rounded-md bg-indigo-500/20 px-2 py-0.5 text-[10px] font-semibold text-indigo-200">레드아이</span>}
         </p>
       </div>

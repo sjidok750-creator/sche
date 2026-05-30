@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { RosterData, Schedule, Trip } from "../types";
 import {
-  CATEGORY_META,
+  categoryMeta,
   currentMonthKey,
   fmtDuration,
   kstToday,
@@ -177,7 +177,7 @@ function MonthBody({ sched, today }: { sched: Schedule; today: string }) {
               const isSaturday = (dow + d.day - 1) % 7 === 6;
               const accent =
                 (d.kind === "flight" || d.kind === "layover") && d.category
-                  ? CATEGORY_META[d.category].accent
+                  ? categoryMeta(d.category).accent
                   : KIND_COLOR[d.kind];
               const offCode = isOff ? offCodeForDate(sched, d.date) : undefined;
 
@@ -259,9 +259,9 @@ function MonthBody({ sched, today }: { sched: Schedule; today: string }) {
 }
 
 function BoardingPass({ trip }: { trip: Trip }) {
-  const meta = CATEGORY_META[trip.category];
-  const out = trip.legs.find((l) => l.dir === "out");
-  const back = trip.legs.find((l) => l.dir === "in");
+  const meta = categoryMeta(trip.category);
+  const out = (trip.legs || []).find((l) => l.dir === "out");
+  const back = (trip.legs || []).find((l) => l.dir === "in");
 
   return (
     <div className="glass relative overflow-hidden rounded-3xl">
@@ -277,16 +277,16 @@ function BoardingPass({ trip }: { trip: Trip }) {
           {meta.label}
         </span>
         <span className="font-mono text-[11px] text-[var(--muted)] tnum">
-          {trip.start.slice(5).replace("-", ".")}–{trip.end.slice(5).replace("-", ".")} · {trip.days}일
+          {trip.start ? trip.start.slice(5).replace("-", ".") : "—"}–{trip.end ? trip.end.slice(5).replace("-", ".") : "—"}{trip.days ? ` · ${trip.days}일` : ""}
         </span>
       </div>
       <div className="relative flex items-end justify-between px-5 py-4">
-        <p className="font-display text-3xl font-extrabold tracking-tight">{trip.legs[0]?.from ?? "—"}</p>
+        <p className="font-display text-3xl font-extrabold tracking-tight">{(trip.legs || [])[0]?.from ?? "—"}</p>
         <div className="flex flex-1 flex-col items-center px-3 pb-1.5 text-[var(--faint)]">
           <PlaneIcon size={16} className="rotate-90 text-sky-300" />
-          <p className="mt-1 font-mono text-[11px] text-[var(--muted)]">{trip.destination.city}</p>
+          <p className="mt-1 font-mono text-[11px] text-[var(--muted)]">{trip.destination?.city ?? ""}</p>
         </div>
-        <p className="font-display text-3xl font-extrabold tracking-tight">{trip.destination.code}</p>
+        <p className="font-display text-3xl font-extrabold tracking-tight">{trip.destination?.code ?? "—"}</p>
       </div>
       <div className="relative">
         <span className="absolute -left-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-[var(--bg)]" />
