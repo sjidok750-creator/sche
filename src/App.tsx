@@ -75,7 +75,7 @@ export default function App() {
                     />
                   }
                 />
-                <Route path="/month" element={<MonthPage data={state.data} />} />
+                <Route path="/month" element={<MonthPage data={state.data} onDataUpdate={updateSchedule} />} />
                 <Route path="/help" element={<HelpPage data={state.data} />} />
                 <Route path="*" element={<Navigate to="/today" replace />} />
               </Routes>

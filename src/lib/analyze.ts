@@ -138,19 +138,19 @@ function postProcess(sched: Schedule, yearMonth: string): Schedule {
     const start = fixDate(t.start) || dates[0] || `${prefix}-01`;
     const end   = fixDate(t.end)   || dates[dates.length - 1] || start;
 
-    // 레이오버 박수 자동 계산 (출발 leg ~ 귀국 leg 날짜 차이)
+    // 레이오버 박수는 AI값 무시하고 항상 재계산
+    // 도착일(out leg arrDate) ~ 귀국 출발일(in leg date) 차이 = 실제 숙박 박수
     const outLeg = legs.find(l => l.dir === "out");
     const inLeg = legs.find(l => l.dir === "in");
-    let layover = t.layover;
-    if (!layover && outLeg && inLeg && category !== "domestic") {
-      // 도착일(out leg arrDate) ~ 귀국 출발일(in leg date) 차이 = 실제 숙박 박수
+    let layover = undefined as Trip["layover"];
+    if (outLeg && inLeg && category !== "domestic") {
       const arrivedDay = outLeg.arrDate || outLeg.date;
       const nights = Math.round(
         (new Date(`${inLeg.date}T00:00:00Z`).getTime() - new Date(`${arrivedDay}T00:00:00Z`).getTime()) / 86400000
       );
       if (nights >= 1) {
         layover = {
-          city: t.destination?.city || destCode,
+          city: t.layover?.city || t.destination?.city || destCode,
           nights,
           from: outLeg.to,
           to: inLeg.from,

@@ -28,13 +28,14 @@ const KIND_COLOR: Record<RhythmKind, string> = {
   empty: "transparent"
 };
 
-export default function MonthPage({ data }: { data: RosterData }) {
+export default function MonthPage({ data, onDataUpdate }: { data: RosterData; onDataUpdate?: (d: RosterData) => void }) {
   const today = kstToday();
   const curKey = currentMonthKey(today);
   const keys = useMemo(() => monthKeys(data), [data]);
 
   const initial = keys.includes(curKey) ? curKey : keys[keys.length - 1] ?? curKey;
   const [sel, setSel] = useState(initial);
+  const [editDate, setEditDate] = useState<string | null>(null);
 
   if (keys.length === 0) {
     return (
@@ -50,6 +51,26 @@ export default function MonthPage({ data }: { data: RosterData }) {
   const canNext = idx >= 0 && idx < keys.length - 1;
   const sched = data.months.find((m) => m.month === sel);
 
+  // 날짜의 종류를 휴무/교육/대기로 변경
+  const applyDayKind = (date: string, kind: "off-ado" | "off-atdo" | "off-pdo" | "education" | "standby") => {
+    if (!sched || !onDataUpdate) return;
+    const next: Schedule = {
+      ...sched,
+      offDays: sched.offDays.filter(o => o.date !== date),
+      education: sched.education.filter(e => e.date !== date),
+      // 비행 leg가 있는 날을 휴무로 바꾸면 해당 leg도 제거
+      trips: sched.trips.map(t => ({ ...t, legs: t.legs.filter(l => l.date !== date) })).filter(t => t.legs.length > 0),
+    };
+    if (kind === "off-ado") next.offDays.push({ date, code: "ADO" });
+    else if (kind === "off-atdo") next.offDays.push({ date, code: "ATDO" });
+    else if (kind === "off-pdo") next.offDays.push({ date, code: "PDO" });
+    else if (kind === "education") next.education.push({ date, from: "08:30", to: "17:30", place: "ICN" });
+    // standby = 아무것도 없음
+    const updated: RosterData = { months: data.months.map(m => m.month === sel ? next : m) };
+    onDataUpdate(updated);
+    setEditDate(null);
+  };
+
   return (
     <div className="space-y-5">
       <Header
@@ -60,7 +81,45 @@ export default function MonthPage({ data }: { data: RosterData }) {
         onPrev={() => canPrev && setSel(keys[idx - 1])}
         onNext={() => canNext && setSel(keys[idx + 1])}
       />
-      {sched ? <MonthBody key={sched.month} sched={sched} today={today} /> : <EmptyMonth monthKey={sel} />}
+      {sched ? <MonthBody key={sched.month} sched={sched} today={today} onDayTap={onDataUpdate ? setEditDate : undefined} /> : <EmptyMonth monthKey={sel} />}
+      {editDate && (
+        <DayEditor date={editDate} onClose={() => setEditDate(null)} onPick={applyDayKind} />
+      )}
+    </div>
+  );
+}
+
+function DayEditor({ date, onClose, onPick }: {
+  date: string;
+  onClose: () => void;
+  onPick: (date: string, kind: "off-ado" | "off-atdo" | "off-pdo" | "education" | "standby") => void;
+}) {
+  const day = Number(date.slice(8));
+  const opts: { k: "off-ado" | "off-atdo" | "off-pdo" | "education" | "standby"; label: string; color: string }[] = [
+    { k: "off-ado", label: "휴무 ADO", color: "#4ade80" },
+    { k: "off-atdo", label: "휴무 ATDO", color: "#4ade80" },
+    { k: "off-pdo", label: "휴무 PDO", color: "#4ade80" },
+    { k: "education", label: "교육 EDU", color: "#f0c46a" },
+    { k: "standby", label: "대기 (비우기)", color: "#7ca3c8" },
+  ];
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className="glass w-full max-w-md rounded-[28px] p-5 space-y-3" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <p className="font-display text-lg font-bold">{day}일 수정</p>
+          <button onClick={onClose} className="text-sm text-[var(--faint)]">닫기</button>
+        </div>
+        <p className="text-xs text-[var(--muted)]">이 날의 종류를 직접 바꿔요. 비행 일정은 자동 분석 결과를 유지하려면 건드리지 마세요.</p>
+        <div className="grid gap-2">
+          {opts.map(o => (
+            <button key={o.k} onClick={() => onPick(date, o.k)}
+              className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-left hover:bg-white/[0.08] transition">
+              <span className="h-3 w-3 rounded-[3px]" style={{ background: o.color }} />
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -106,7 +165,7 @@ function NavBtn({ disabled, onClick, dir }: { disabled: boolean; onClick: () => 
   );
 }
 
-function MonthBody({ sched, today }: { sched: Schedule; today: string }) {
+function MonthBody({ sched, today, onDayTap }: { sched: Schedule; today: string; onDayTap?: (date: string) => void }) {
   const sum = monthSummary(sched);
   const rhythm = monthRhythm(sched);
   const dow = monthStartDow(sched.month);
@@ -150,7 +209,10 @@ function MonthBody({ sched, today }: { sched: Schedule; today: string }) {
 
       {/* ── 달력형 리듬 ── */}
       <section className="rise rise-2">
-        <p className="eyebrow mb-2.5 px-1">한 달의 리듬</p>
+        <div className="mb-2.5 flex items-center justify-between px-1">
+          <p className="eyebrow">한 달의 리듬</p>
+          {onDayTap && <p className="text-[10px] text-[var(--faint)]">날짜를 탭해서 수정</p>}
+        </div>
         <div className="glass rounded-2xl p-3 pt-2.5">
           {/* 요일 헤더 */}
           <div className="mb-1.5 grid grid-cols-7 gap-1">
@@ -185,9 +247,10 @@ function MonthBody({ sched, today }: { sched: Schedule; today: string }) {
                 <div
                   key={d.date}
                   title={`${d.day}일${offCode ? ` · ${offCode}` : ""}`}
+                  onClick={() => onDayTap?.(d.date)}
                   className={`relative flex flex-col items-center justify-center rounded-xl transition ${
                     isOff ? "aspect-auto py-1.5" : "aspect-square"
-                  } ${isToday ? "ring-2 ring-white/60 ring-offset-1 ring-offset-transparent" : ""}`}
+                  } ${onDayTap ? "cursor-pointer active:scale-95" : ""} ${isToday ? "ring-2 ring-white/60 ring-offset-1 ring-offset-transparent" : ""}`}
                   style={{
                     background: d.kind === "empty" ? "transparent" : `${accent}20`,
                     boxShadow: d.kind !== "empty" && d.kind !== "standby"
