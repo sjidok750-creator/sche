@@ -1,5 +1,5 @@
 const K = {
-  ANTHROPIC: "roster_anthropic_key",
+  OR_KEY: "roster_or_key",        // OpenRouter API 키
   GH_TOKEN: "roster_gh_token",
   GH_OWNER: "roster_gh_owner",
   GH_REPO: "roster_gh_repo",
@@ -14,8 +14,8 @@ function set(k: string, v: string) {
 }
 
 export const Settings = {
-  get anthropicKey() { return get(K.ANTHROPIC); },
-  set anthropicKey(v: string) { set(K.ANTHROPIC, v); },
+  get orKey() { return get(K.OR_KEY); },
+  set orKey(v: string) { set(K.OR_KEY, v); },
 
   get ghToken() { return get(K.GH_TOKEN); },
   set ghToken(v: string) { set(K.GH_TOKEN, v); },
@@ -29,6 +29,6 @@ export const Settings = {
   get ghBranch() { return get(K.GH_BRANCH) || "claude/practical-euler-PiM9i"; },
   set ghBranch(v: string) { set(K.GH_BRANCH, v); },
 
-  isReady() { return !!this.anthropicKey; },
+  isReady() { return !!this.orKey; },
   canAutoPush() { return !!this.ghToken; }
 };
