@@ -72,6 +72,7 @@ export type TodayKind =
   | "layover"
   | "off"
   | "education"
+  | "standby"
   | "none";
 
 export interface TodayStatus {

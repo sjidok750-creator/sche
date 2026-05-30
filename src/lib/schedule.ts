@@ -77,7 +77,8 @@ export function resolveToday(data: Schedule, today: string): TodayStatus {
       if (!onLeg) return { kind: "layover", trip: t };
     }
   }
-  return { kind: "none" };
+  // 스케줄은 있는데 어떤 분류에도 안 걸리면 → 대기
+  return { kind: "standby" };
 }
 
 /** 오늘 이후 가장 가까운 다음 이벤트(미리보기) */
@@ -219,7 +220,8 @@ export type RhythmKind =
   | "layover"
   | "off"
   | "education"
-  | "empty";
+  | "standby"
+  | "empty"; // 달력에서 앞뒤 빈 칸(다른 달)
 
 export interface RhythmDay {
   date: string;
@@ -235,7 +237,7 @@ export function monthRhythm(data: Schedule): RhythmDay[] {
   const out: RhythmDay[] = [];
   for (let d = 1; d <= days; d++) {
     const date = `${data.month}-${String(d).padStart(2, "0")}`;
-    let kind: RhythmKind = "empty";
+    let kind: RhythmKind = "standby"; // 분류 없으면 = 대기
     let category: Category | undefined;
     if ((data.education || []).some((e) => e.date === date)) kind = "education";
     else if ((data.offDays || []).some((o) => o.date === date)) kind = "off";
@@ -259,4 +261,14 @@ export function monthRhythm(data: Schedule): RhythmDay[] {
     out.push({ date, day: d, kind, category });
   }
   return out;
+}
+
+/** 1일이 무슨 요일인지 반환 (0=일, 6=토). 정오 UTC 기준으로 TZ 오차 방지. */
+export function monthStartDow(monthKey: string): number {
+  return new Date(`${monthKey}-01T12:00:00Z`).getUTCDay();
+}
+
+/** 해당 달 offDay 코드 조회 */
+export function offCodeForDate(data: Schedule, date: string): string | undefined {
+  return (data.offDays || []).find((o) => o.date === date)?.code;
 }

@@ -8,18 +8,24 @@ import {
   kstToday,
   monthKeys,
   monthRhythm,
+  monthStartDow,
   monthSummary,
+  offCodeForDate,
   shiftMonth,
   type RhythmKind
 } from "../lib/schedule";
 import { ChevronLeft, ChevronRight, PlaneIcon } from "../components/icons";
 
-const RHYTHM_COLORS: Record<RhythmKind, string> = {
+const WEEK_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+
+/* 달력 셀 색상 */
+const KIND_COLOR: Record<RhythmKind, string> = {
   flight: "#5b8def",
   layover: "#2dd4bf",
-  off: "#6ee7a8",
+  off: "#4ade80",        // 밝은 녹색 — 더 눈에 띄게
   education: "#f0c46a",
-  empty: "rgba(255,255,255,0.06)"
+  standby: "#334155",   // 대기: 슬레이트
+  empty: "transparent"
 };
 
 export default function MonthPage({ data }: { data: RosterData }) {
@@ -27,9 +33,7 @@ export default function MonthPage({ data }: { data: RosterData }) {
   const curKey = currentMonthKey(today);
   const keys = useMemo(() => monthKeys(data), [data]);
 
-  const initial = keys.includes(curKey)
-    ? curKey
-    : keys[keys.length - 1] ?? curKey;
+  const initial = keys.includes(curKey) ? curKey : keys[keys.length - 1] ?? curKey;
   const [sel, setSel] = useState(initial);
 
   if (keys.length === 0) {
@@ -44,12 +48,10 @@ export default function MonthPage({ data }: { data: RosterData }) {
   const idx = keys.indexOf(sel);
   const canPrev = idx > 0;
   const canNext = idx >= 0 && idx < keys.length - 1;
-  const sched = keys.includes(sel)
-    ? data.months.find((m) => m.month === sel)
-    : undefined;
+  const sched = data.months.find((m) => m.month === sel);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <Header
         sel={sel}
         curKey={curKey}
@@ -58,11 +60,7 @@ export default function MonthPage({ data }: { data: RosterData }) {
         onPrev={() => canPrev && setSel(keys[idx - 1])}
         onNext={() => canNext && setSel(keys[idx + 1])}
       />
-      {sched ? (
-        <MonthBody key={sched.month} sched={sched} />
-      ) : (
-        <EmptyMonth monthKey={sel} />
-      )}
+      {sched ? <MonthBody key={sched.month} sched={sched} today={today} /> : <EmptyMonth monthKey={sel} />}
     </div>
   );
 }
@@ -74,20 +72,9 @@ function relLabel(sel: string, curKey: string): string {
   return "스케줄";
 }
 
-function Header({
-  sel,
-  curKey,
-  canPrev,
-  canNext,
-  onPrev,
-  onNext
-}: {
-  sel: string;
-  curKey: string;
-  canPrev: boolean;
-  canNext: boolean;
-  onPrev: () => void;
-  onNext: () => void;
+function Header({ sel, curKey, canPrev, canNext, onPrev, onNext }: {
+  sel: string; curKey: string; canPrev: boolean; canNext: boolean;
+  onPrev: () => void; onNext: () => void;
 }) {
   const [y, m] = sel.split("-");
   return (
@@ -104,24 +91,14 @@ function Header({
   );
 }
 
-function NavBtn({
-  disabled,
-  onClick,
-  dir
-}: {
-  disabled: boolean;
-  onClick: () => void;
-  dir: "left" | "right";
-}) {
+function NavBtn({ disabled, onClick, dir }: { disabled: boolean; onClick: () => void; dir: "left" | "right" }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       aria-label={dir === "left" ? "이전 달" : "다음 달"}
       className={`grid h-11 w-11 place-items-center rounded-full border border-white/10 transition ${
-        disabled
-          ? "opacity-25"
-          : "bg-white/[0.04] text-white hover:bg-white/[0.08] active:scale-95"
+        disabled ? "opacity-20" : "bg-white/[0.04] text-white hover:bg-white/[0.08] active:scale-95"
       }`}
     >
       {dir === "left" ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
@@ -129,20 +106,14 @@ function NavBtn({
   );
 }
 
-function MonthBody({ sched }: { sched: Schedule }) {
+function MonthBody({ sched, today }: { sched: Schedule; today: string }) {
   const sum = monthSummary(sched);
   const rhythm = monthRhythm(sched);
-
-  const stats = [
-    { label: "트립", value: sum.trips },
-    { label: "비행편", value: sum.flights },
-    { label: "L/O박", value: sum.layoverNights },
-    { label: "휴무", value: sum.offDays },
-    { label: "교육", value: sum.educationDays }
-  ];
+  const dow = monthStartDow(sched.month);
 
   return (
     <>
+      {/* 총 비행시간 히어로 */}
       <section className="rise rise-1 glass relative overflow-hidden rounded-3xl p-5">
         <div
           className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full opacity-25 blur-3xl"
@@ -151,7 +122,7 @@ function MonthBody({ sched }: { sched: Schedule }) {
         <div className="relative flex items-end justify-between">
           <div>
             <p className="eyebrow">총 비행시간</p>
-            <p className="mt-1.5 font-display text-4xl font-extrabold leading-none tracking-tight tnum">
+            <p className="mt-1.5 font-display text-4xl font-extrabold leading-none tnum">
               {fmtDuration(sum.blockMinutes)}
             </p>
           </div>
@@ -162,87 +133,128 @@ function MonthBody({ sched }: { sched: Schedule }) {
         </div>
       </section>
 
-      <section className="rise rise-1 grid grid-cols-5 gap-2">
-        {stats.map((s) => (
-          <div
-            key={s.label}
-            className="glass rounded-2xl px-1 py-3 text-center"
-          >
-            <p className="font-display text-xl font-bold tnum">{s.value}</p>
+      {/* 요약 */}
+      <section className="rise rise-1 grid grid-cols-4 gap-2">
+        {[
+          { label: "트립", v: sum.trips },
+          { label: "L/O박", v: sum.layoverNights },
+          { label: "휴무", v: sum.offDays },
+          { label: "교육", v: sum.educationDays }
+        ].map((s) => (
+          <div key={s.label} className="glass rounded-2xl px-1 py-3 text-center">
+            <p className="font-display text-xl font-bold tnum">{s.v}</p>
             <p className="mt-0.5 text-[10px] text-[var(--faint)]">{s.label}</p>
           </div>
         ))}
       </section>
 
+      {/* ── 달력형 리듬 ── */}
       <section className="rise rise-2">
-        <p className="eyebrow mb-3 px-1">한 달의 리듬</p>
-        <div className="glass rounded-2xl p-4">
-          <div className="grid grid-cols-7 gap-1.5">
+        <p className="eyebrow mb-2.5 px-1">한 달의 리듬</p>
+        <div className="glass rounded-2xl p-3 pt-2.5">
+          {/* 요일 헤더 */}
+          <div className="mb-1.5 grid grid-cols-7 gap-1">
+            {WEEK_LABELS.map((d, i) => (
+              <p
+                key={d}
+                className="text-center text-[10px] font-semibold"
+                style={{ color: i === 0 ? "#f87171" : i === 6 ? "#93c5fd" : "var(--faint)" }}
+              >
+                {d}
+              </p>
+            ))}
+          </div>
+
+          {/* 날짜 셀 */}
+          <div className="grid grid-cols-7 gap-1">
+            {/* 시작 오프셋 */}
+            {Array.from({ length: dow }).map((_, i) => <div key={`o${i}`} />)}
+
             {rhythm.map((d) => {
-              const color =
+              const isToday = d.date === today;
+              const isOff = d.kind === "off";
+              const isSunday = (dow + d.day - 1) % 7 === 0;
+              const isSaturday = (dow + d.day - 1) % 7 === 6;
+              const accent =
                 (d.kind === "flight" || d.kind === "layover") && d.category
                   ? CATEGORY_META[d.category].accent
-                  : RHYTHM_COLORS[d.kind];
+                  : KIND_COLOR[d.kind];
+              const offCode = isOff ? offCodeForDate(sched, d.date) : undefined;
+
               return (
                 <div
                   key={d.date}
-                  title={`${d.day}일`}
-                  className="flex aspect-square items-center justify-center rounded-lg text-[10px] font-semibold tnum"
+                  title={`${d.day}일${offCode ? ` · ${offCode}` : ""}`}
+                  className={`relative flex flex-col items-center justify-center rounded-xl transition ${
+                    isOff ? "aspect-auto py-1.5" : "aspect-square"
+                  } ${isToday ? "ring-2 ring-white/60 ring-offset-1 ring-offset-transparent" : ""}`}
                   style={{
-                    background:
-                      d.kind === "empty" ? color : `${color}26`,
-                    color: d.kind === "empty" ? "var(--faint)" : color,
-                    boxShadow:
-                      d.kind === "empty"
-                        ? "none"
-                        : `inset 0 0 0 1px ${color}55`
+                    background: d.kind === "empty" ? "transparent" : `${accent}20`,
+                    boxShadow: d.kind !== "empty" && d.kind !== "standby"
+                      ? `inset 0 0 0 1px ${accent}50`
+                      : isOff ? undefined : "inset 0 0 0 1px rgba(255,255,255,0.06)"
                   }}
                 >
-                  {d.day}
+                  <span
+                    className="text-[11px] font-semibold tnum leading-none"
+                    style={{
+                      color: isOff
+                        ? "#4ade80"
+                        : isSunday
+                        ? "#f87171"
+                        : isSaturday
+                        ? "#93c5fd"
+                        : d.kind === "standby"
+                        ? "var(--faint)"
+                        : accent
+                    }}
+                  >
+                    {d.day}
+                  </span>
+                  {isOff && offCode && (
+                    <span
+                      className="mt-0.5 text-[8px] font-bold leading-none tracking-wide"
+                      style={{ color: "#4ade80" }}
+                    >
+                      {offCode.replace("ATDO","ATD").replace("ADO","ADO")}
+                    </span>
+                  )}
+                  {d.kind === "standby" && (
+                    <span className="mt-0.5 h-1 w-1 rounded-full bg-white/20" />
+                  )}
                 </div>
               );
             })}
           </div>
-          <Legend />
+
+          {/* 범례 */}
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-white/8 pt-3">
+            {([
+              ["flight", "비행"],
+              ["layover", "레이오버"],
+              ["off", "휴무"],
+              ["education", "교육"],
+              ["standby", "대기"]
+            ] as [RhythmKind, string][]).map(([k, t]) => (
+              <span key={k} className="flex items-center gap-1.5 text-[10px] text-[var(--muted)]">
+                <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: KIND_COLOR[k] }} />
+                {t}
+              </span>
+            ))}
+          </div>
         </div>
       </section>
 
+      {/* 트립 보딩패스 */}
       <section className="rise rise-3 space-y-3">
         <p className="eyebrow px-1">트립</p>
         {sched.trips.length === 0 ? (
-          <p className="px-1 text-sm text-[var(--faint)]">
-            등록된 트립이 없어요.
-          </p>
+          <p className="px-1 text-sm text-[var(--faint)]">등록된 트립이 없어요.</p>
         ) : (
           sched.trips.map((t) => <BoardingPass key={t.id} trip={t} />)
         )}
       </section>
     </>
-  );
-}
-
-function Legend() {
-  const items: { k: RhythmKind; t: string }[] = [
-    { k: "flight", t: "비행" },
-    { k: "layover", t: "레이오버" },
-    { k: "off", t: "휴무" },
-    { k: "education", t: "교육" }
-  ];
-  return (
-    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-white/8 pt-3">
-      {items.map((i) => (
-        <span
-          key={i.k}
-          className="flex items-center gap-1.5 text-[10px] text-[var(--muted)]"
-        >
-          <span
-            className="h-2.5 w-2.5 rounded-[3px]"
-            style={{ background: RHYTHM_COLORS[i.k] }}
-          />
-          {i.t}
-        </span>
-      ))}
-    </div>
   );
 }
 
@@ -255,9 +267,7 @@ function BoardingPass({ trip }: { trip: Trip }) {
     <div className="glass relative overflow-hidden rounded-3xl">
       <div
         className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full opacity-25 blur-3xl"
-        style={{
-          background: `radial-gradient(circle,${meta.accent},transparent 70%)`
-        }}
+        style={{ background: `radial-gradient(circle,${meta.accent},transparent 70%)` }}
       />
       <div className="relative flex items-center justify-between px-5 pt-4">
         <span
@@ -267,48 +277,31 @@ function BoardingPass({ trip }: { trip: Trip }) {
           {meta.label}
         </span>
         <span className="font-mono text-[11px] text-[var(--muted)] tnum">
-          {trip.start.slice(5).replace("-", ".")}–
-          {trip.end.slice(5).replace("-", ".")} · {trip.days}일
+          {trip.start.slice(5).replace("-", ".")}–{trip.end.slice(5).replace("-", ".")} · {trip.days}일
         </span>
       </div>
-
       <div className="relative flex items-end justify-between px-5 py-4">
-        <p className="font-display text-3xl font-extrabold tracking-tight">
-          {trip.legs[0]?.from ?? "—"}
-        </p>
+        <p className="font-display text-3xl font-extrabold tracking-tight">{trip.legs[0]?.from ?? "—"}</p>
         <div className="flex flex-1 flex-col items-center px-3 pb-1.5 text-[var(--faint)]">
           <PlaneIcon size={16} className="rotate-90 text-sky-300" />
-          <p className="mt-1 font-mono text-[11px] text-[var(--muted)]">
-            {trip.destination.city}
-          </p>
+          <p className="mt-1 font-mono text-[11px] text-[var(--muted)]">{trip.destination.city}</p>
         </div>
-        <p className="font-display text-3xl font-extrabold tracking-tight">
-          {trip.destination.code}
-        </p>
+        <p className="font-display text-3xl font-extrabold tracking-tight">{trip.destination.code}</p>
       </div>
-
       <div className="relative">
         <span className="absolute -left-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-[var(--bg)]" />
         <span className="absolute -right-2.5 top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-[var(--bg)]" />
         <div className="mx-5 border-t border-dashed border-white/15" />
       </div>
-
       <div className="relative grid grid-cols-2 gap-3 px-5 py-4 font-mono text-xs">
         <LegRow label="OUT" leg={out} />
         <LegRow label="IN" leg={back} />
       </div>
-
       {(trip.layover || trip.redeye) && (
         <div className="relative flex items-center gap-2 border-t border-white/8 px-5 py-2.5 text-[11px] text-[var(--muted)]">
-          {trip.layover && (
-            <span>
-              {trip.layover.city} {trip.layover.nights}박
-            </span>
-          )}
+          {trip.layover && <span>{trip.layover.city} {trip.layover.nights}박</span>}
           {trip.redeye && (
-            <span className="rounded-md bg-indigo-500/20 px-2 py-0.5 text-[10px] font-semibold text-indigo-200">
-              레드아이
-            </span>
+            <span className="rounded-md bg-indigo-500/20 px-2 py-0.5 text-[10px] font-semibold text-indigo-200">레드아이</span>
           )}
         </div>
       )}
@@ -316,13 +309,7 @@ function BoardingPass({ trip }: { trip: Trip }) {
   );
 }
 
-function LegRow({
-  label,
-  leg
-}: {
-  label: string;
-  leg: Trip["legs"][number] | undefined;
-}) {
+function LegRow({ label, leg }: { label: string; leg: Trip["legs"][number] | undefined }) {
   if (!leg) return <div className="text-[var(--faint)]">{label} · —</div>;
   return (
     <div>
@@ -330,9 +317,7 @@ function LegRow({
       <p className="mt-1 text-sm text-[var(--ink)]">{leg.flight ?? "—"}</p>
       <p className="mt-0.5 text-[var(--muted)]">
         {leg.from} {leg.dep ?? "--:--"} → {leg.to} {leg.arr ?? "--:--"}
-        {leg.arrDate !== leg.date && (
-          <sup className="ml-0.5 text-[9px] text-amber-300">+1</sup>
-        )}
+        {leg.arrDate !== leg.date && <sup className="ml-0.5 text-[9px] text-amber-300">+1</sup>}
       </p>
     </div>
   );
@@ -348,14 +333,13 @@ function EmptyMonth({ monthKey }: { monthKey?: string }) {
         {monthKey ? `${monthKey.replace("-", ".")} 스케줄 없음` : "등록된 스케줄이 없어요"}
       </h2>
       <p className="mx-auto mt-2 max-w-[17rem] text-sm leading-relaxed text-[var(--muted)]">
-        스케줄 사진을 올려 데이터를 만들면 매달 쌓여 지난달·다음 달도 볼 수
-        있어요.
+        스케줄 사진을 올리면 달마다 쌓여 지난달·다음 달도 볼 수 있어요.
       </p>
       <Link
-        to="/help"
+        to="/"
         className="mt-6 inline-flex items-center rounded-full border border-white/12 bg-white/[0.05] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/[0.09]"
       >
-        스케줄 등록하는 법
+        사진 올리러 가기
       </Link>
     </div>
   );
