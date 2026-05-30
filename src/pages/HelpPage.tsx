@@ -42,22 +42,22 @@ export default function HelpPage({ data }: { data: RosterData }) {
 }
 
 function OpenRouterSection() {
-  const [key, setKey] = useState(Settings.orKey);
+  const [key, setKey] = useState(Settings.anthropicKey);
   const [show, setShow] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const save = () => {
-    Settings.orKey = key.trim();
+    Settings.anthropicKey = key.trim();
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
   return (
-    <Section title="AI 자동 분석 (무료)" delay="rise-2">
+    <Section title="AI 자동 분석" delay="rise-2">
       <p className="mb-3 text-sm text-[var(--muted)]">
-        OpenRouter 무료 키를 입력하면 사진만 올려도 자동 분석돼요 — 하루 200회 무료.{" "}
+        Anthropic API 키를 입력하면 사진만 올려도 자동 분석돼요.{" "}
         <a
-          href="https://openrouter.ai/keys"
+          href="https://console.anthropic.com/settings/keys"
           target="_blank" rel="noopener noreferrer"
           className="text-sky-400 underline-offset-2 hover:underline"
         >
@@ -70,7 +70,7 @@ function OpenRouterSection() {
             type={show ? "text" : "password"}
             value={key}
             onChange={e => setKey(e.target.value)}
-            placeholder="sk-or-…"
+            placeholder="sk-ant-…"
             className="w-full rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2.5 font-mono text-sm text-white placeholder-[var(--faint)] outline-none focus:border-sky-500/40"
           />
           <button type="button" onClick={() => setShow(v => !v)}

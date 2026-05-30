@@ -12,46 +12,6 @@ JSON만 출력 — 코드펜스·설명 없이, 객체 하나만.
 - leg마다 block(비행시간, 분) 포함. 공항코드는 IATA 표준.
 - destination.city는 한국어, country는 ISO-2 코드.`;
 
-// Preferred free vision models — tried in order
-const PREFERRED = [
-  "qwen/qwen2.5-vl-72b-instruct:free",
-  "qwen/qwen2-vl-7b-instruct:free",
-  "google/gemini-2.0-flash-exp:free",
-  "google/gemini-2.0-flash-thinking-exp:free",
-  "meta-llama/llama-4-scout:free",
-  "meta-llama/llama-4-maverick:free",
-];
-
-interface ORModel {
-  id: string;
-  architecture?: { modality?: string };
-}
-
-let _freeVisionCache: string[] | null = null;
-
-async function getFreeVisionModels(apiKey: string): Promise<string[]> {
-  if (_freeVisionCache) return _freeVisionCache;
-  try {
-    const res = await fetch("https://openrouter.ai/api/v1/models", {
-      headers: { Authorization: `Bearer ${apiKey}` }
-    });
-    if (!res.ok) throw new Error("models list failed");
-    const body = await res.json() as { data: ORModel[] };
-    const vision = body.data
-      .filter(m => m.id.endsWith(":free") && /image|vision|multimodal/i.test(m.architecture?.modality ?? ""))
-      .map(m => m.id);
-    // preferred first, then any others
-    const sorted = [
-      ...PREFERRED.filter(id => vision.includes(id)),
-      ...vision.filter(id => !PREFERRED.includes(id))
-    ];
-    _freeVisionCache = sorted.length ? sorted : PREFERRED;
-  } catch {
-    _freeVisionCache = PREFERRED;
-  }
-  return _freeVisionCache;
-}
-
 async function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -70,23 +30,27 @@ function extractJson(text: string): string {
   return text.trim();
 }
 
-async function tryModel(model: string, b64: string, mimeType: string, apiKey: string): Promise<Schedule> {
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+export async function analyzeImage(file: File, apiKey: string): Promise<Schedule> {
+  const b64 = await fileToBase64(file);
+  const mimeType = (file.type || "image/jpeg") as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": location.origin,
-      "X-Title": "Flight Roster PWA"
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model,
+      model: "claude-opus-4-5",
+      max_tokens: 4096,
       messages: [
         {
           role: "user",
           content: [
-            { type: "text", text: PROMPT },
-            { type: "image_url", image_url: { url: `data:${mimeType};base64,${b64}` } }
+            { type: "image", source: { type: "base64", media_type: mimeType, data: b64 } },
+            { type: "text", text: PROMPT }
           ]
         }
       ]
@@ -95,11 +59,11 @@ async function tryModel(model: string, b64: string, mimeType: string, apiKey: st
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
-    throw new Error(err.error?.message ?? `HTTP ${res.status}`);
+    throw new Error(err.error?.message ?? `Anthropic API ${res.status}`);
   }
 
-  const body = await res.json() as { choices: { message: { content: string } }[] };
-  const text = body.choices?.[0]?.message?.content ?? "";
+  const body = await res.json() as { content: { type: string; text: string }[] };
+  const text = body.content?.find(b => b.type === "text")?.text ?? "";
   if (!text) throw new Error("빈 응답");
 
   const jsonText = extractJson(text);
@@ -111,20 +75,4 @@ async function tryModel(model: string, b64: string, mimeType: string, apiKey: st
   }
   if (!schedule.month) throw new Error("month 필드 없음");
   return schedule;
-}
-
-export async function analyzeImage(file: File, apiKey: string): Promise<Schedule> {
-  const b64 = await fileToBase64(file);
-  const mimeType = file.type || "image/jpeg";
-  const models = await getFreeVisionModels(apiKey);
-
-  let lastError = "";
-  for (const model of models) {
-    try {
-      return await tryModel(model, b64, mimeType, apiKey);
-    } catch (e) {
-      lastError = `[${model}] ${e instanceof Error ? e.message : e}`;
-    }
-  }
-  throw new Error(lastError);
 }

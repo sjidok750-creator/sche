@@ -236,7 +236,7 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
 
     if (autoAnalyze) {
       setStep("analyzing");
-      const key = Settings.orKey;
+      const key = Settings.anthropicKey;
       Promise.all(
         items.map(item =>
           analyzeImage(item.file, key)
