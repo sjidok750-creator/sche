@@ -1,18 +1,19 @@
 import { NavLink, Route, Routes, Navigate } from "react-router-dom";
 import { useSchedule } from "./lib/useSchedule";
+
 import TodayPage from "./pages/TodayPage";
 import MonthPage from "./pages/MonthPage";
 import HelpPage from "./pages/HelpPage";
 import { CalendarIcon, HelpIcon, TodayDot } from "./components/icons";
 
 const tabs = [
-  { to: "/today", label: "오늘", Icon: TodayDot },
+  { to: "/today", label: "홈", Icon: TodayDot },
   { to: "/month", label: "스케줄", Icon: CalendarIcon },
-  { to: "/help", label: "도움말", Icon: HelpIcon }
+  { to: "/help", label: "설정", Icon: HelpIcon }
 ];
 
 export default function App() {
-  const state = useSchedule();
+  const [state, updateSchedule] = useSchedule();
 
   return (
     <>
@@ -27,16 +28,21 @@ export default function App() {
               <div className="space-y-2">
                 <p className="text-rose-300">스케줄을 불러오지 못했어요.</p>
                 <p className="text-sm text-[var(--muted)]">{state.error}</p>
-                <p className="text-xs text-[var(--faint)]">
-                  schedule.json 경로를 확인하세요.
-                </p>
               </div>
             </div>
           )}
           {state.status === "ok" && (
             <Routes>
               <Route path="/" element={<Navigate to="/today" replace />} />
-              <Route path="/today" element={<TodayPage data={state.data} />} />
+              <Route
+                path="/today"
+                element={
+                  <TodayPage
+                    data={state.data}
+                    onDataUpdate={updateSchedule}
+                  />
+                }
+              />
               <Route path="/month" element={<MonthPage data={state.data} />} />
               <Route path="/help" element={<HelpPage data={state.data} />} />
               <Route path="*" element={<Navigate to="/today" replace />} />
