@@ -37,7 +37,36 @@ export default function HelpPage({ data }: { data: RosterData }) {
 
       <OpenRouterSection />
       <GithubSection />
+      <DataSection data={data} />
     </div>
+  );
+}
+
+function DataSection({ data }: { data: RosterData }) {
+  const [open, setOpen] = useState(false);
+  const reset = () => {
+    if (!confirm("저장된 스케줄 데이터를 모두 지울까요?")) return;
+    try { localStorage.removeItem("roster_data"); } catch { /* ignore */ }
+    location.reload();
+  };
+  return (
+    <Section title="진단 · 데이터" delay="rise-3">
+      <div className="flex gap-2">
+        <button onClick={() => setOpen(v => !v)}
+          className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm font-semibold text-white/70 hover:bg-white/[0.04]">
+          {open ? "데이터 숨기기" : "저장된 데이터 보기"}
+        </button>
+        <button onClick={reset}
+          className="flex-1 rounded-xl bg-rose-500/20 py-2.5 text-sm font-semibold text-rose-200 hover:bg-rose-500/30">
+          데이터 초기화
+        </button>
+      </div>
+      {open && (
+        <pre className="mt-3 max-h-80 overflow-auto rounded-xl border border-white/10 bg-black/40 p-3 font-mono text-[10px] leading-relaxed text-[var(--muted)]">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      )}
+    </Section>
   );
 }
 
