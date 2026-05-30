@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { RosterData, Schedule } from "../types";
 
+const LS_KEY = "roster_data";
+
 type State =
   | { status: "loading" }
   | { status: "ok"; data: RosterData }
@@ -17,12 +19,32 @@ function normalize(raw: unknown): RosterData {
   return { months: [] };
 }
 
+function loadLocal(): RosterData | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    return normalize(JSON.parse(raw));
+  } catch { return null; }
+}
+
+function saveLocal(data: RosterData) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch { /* ignore */ }
+}
+
 type Updater = (updated: RosterData) => void;
 
 export function useSchedule(): [State, Updater] {
   const [state, setState] = useState<State>({ status: "loading" });
 
   useEffect(() => {
+    // Use localStorage data immediately if available
+    const local = loadLocal();
+    if (local && local.months.length > 0) {
+      setState({ status: "ok", data: local });
+      return;
+    }
+
+    // Otherwise fetch from public/schedule.json
     let alive = true;
     const url = `${import.meta.env.BASE_URL}schedule.json?t=${Date.now()}`;
     fetch(url)
@@ -40,6 +62,7 @@ export function useSchedule(): [State, Updater] {
   }, []);
 
   const updater = useCallback((updated: RosterData) => {
+    saveLocal(updated);
     setState({ status: "ok", data: updated });
   }, []);
 

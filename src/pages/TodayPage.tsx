@@ -306,16 +306,17 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
     setJsonText("");
   };
 
-  const downloadJson = () => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-    a.download = "schedule.json"; a.click();
-  };
-
   /* ── 자동 분석 중 ── */
   if (step === "analyzing") {
     const allDone = photos.every(p => p.status === "done" || p.status === "error");
     const hasError = photos.some(p => p.status === "error");
+    const allSuccess = allDone && !hasError;
+
+    // All success: close automatically after brief delay
+    if (allSuccess) {
+      setTimeout(() => { setPhotos([]); setStep("select"); }, 800);
+    }
+
     return (
       <div className="space-y-3">
         <div className="glass rounded-[24px] p-5 space-y-4">
@@ -331,7 +332,7 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
               </div>
             </div>
           ))}
-          {allDone && (
+          {allDone && hasError && (
             <button
               onClick={() => { setPhotos([]); setStep("select"); }}
               className="w-full rounded-xl border border-white/10 py-2.5 text-sm font-semibold text-white/70 hover:bg-white/[0.04] transition"
@@ -347,22 +348,9 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
   /* ── STEP 1: 사진 선택 ── */
   if (step === "select") return (
     <div className="space-y-3">
-      {pushState === "done" && (
-        <div className="glass rounded-2xl border border-emerald-400/20 px-4 py-3">
-          <p className="text-sm font-semibold text-emerald-300">
-            {Settings.canAutoPush() ? "✓ GitHub에 저장됨 — 1~2분 후 자동 갱신" : "✓ 앱에 반영됐어요"}
-          </p>
-          {!Settings.canAutoPush() && (
-            <button onClick={downloadJson} className="mt-1.5 text-xs text-sky-400 hover:text-sky-200">
-              schedule.json 다운로드 →
-            </button>
-          )}
-        </div>
-      )}
       {pushState === "error" && (
         <div className="glass rounded-2xl border border-rose-400/20 px-4 py-3">
-          <p className="text-sm font-semibold text-rose-300">저장 실패: {pushErr}</p>
-          <button onClick={downloadJson} className="mt-1 text-xs text-sky-400">JSON 다운로드</button>
+          <p className="text-sm font-semibold text-rose-300">GitHub 저장 실패: {pushErr}</p>
         </div>
       )}
 
