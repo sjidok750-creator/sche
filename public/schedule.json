@@ -1,3 +1,114 @@
 {
-  "months": []
+  "months": [
+    {
+      "month": "2026-06",
+      "homeBase": "ICN",
+      "trips": [
+        {
+          "id": "MAD-0602",
+          "category": "long",
+          "region": "유럽",
+          "destination": { "code": "MAD", "city": "마드리드", "country": "ES" },
+          "start": "2026-06-02",
+          "end": "2026-06-05",
+          "days": 4,
+          "redeye": false,
+          "legs": [
+            { "dir": "out", "date": "2026-06-02", "flight": "KE0913", "from": "ICN", "to": "MAD", "dep": "09:55", "arr": "18:00", "arrDate": "2026-06-02", "redeye": false, "block": 905 },
+            { "dir": "in", "date": "2026-06-04", "flight": "KE0914", "from": "MAD", "to": "ICN", "dep": "20:20", "arr": "16:00", "arrDate": "2026-06-05", "redeye": false, "block": 760 }
+          ],
+          "layover": { "city": "마드리드", "nights": 2, "from": "2026-06-02", "to": "2026-06-04" }
+        },
+        {
+          "id": "USN-0608",
+          "category": "domestic",
+          "region": "국내",
+          "destination": { "code": "USN", "city": "울산", "country": "KR" },
+          "start": "2026-06-08",
+          "end": "2026-06-08",
+          "days": 1,
+          "redeye": false,
+          "legs": [
+            { "dir": "out", "date": "2026-06-08", "flight": "KE1843", "from": "GMP", "to": "USN", "dep": "07:20", "arr": "08:20", "arrDate": "2026-06-08", "redeye": false, "block": 60 },
+            { "dir": "in", "date": "2026-06-08", "flight": "KE1844", "from": "USN", "to": "GMP", "dep": "09:00", "arr": "10:00", "arrDate": "2026-06-08", "redeye": false, "block": 60 }
+          ]
+        },
+        {
+          "id": "IAD-0610",
+          "category": "long",
+          "region": "미주",
+          "destination": { "code": "IAD", "city": "워싱턴", "country": "US" },
+          "start": "2026-06-10",
+          "end": "2026-06-13",
+          "days": 4,
+          "redeye": false,
+          "legs": [
+            { "dir": "out", "date": "2026-06-10", "flight": "KE0093", "from": "ICN", "to": "IAD", "dep": "10:25", "arr": "11:15", "arrDate": "2026-06-10", "redeye": false, "block": 830 },
+            { "dir": "in", "date": "2026-06-12", "flight": "KE0094", "from": "IAD", "to": "ICN", "dep": "13:30", "arr": "17:40", "arrDate": "2026-06-13", "redeye": false, "block": 910 }
+          ],
+          "layover": { "city": "워싱턴", "nights": 2, "from": "2026-06-10", "to": "2026-06-12" }
+        },
+        {
+          "id": "BKK-0617",
+          "category": "mid",
+          "region": "동남아",
+          "destination": { "code": "BKK", "city": "방콕", "country": "TH" },
+          "start": "2026-06-17",
+          "end": "2026-06-19",
+          "days": 3,
+          "redeye": true,
+          "legs": [
+            { "dir": "out", "date": "2026-06-17", "flight": "KE0655", "from": "ICN", "to": "BKK", "dep": "21:15", "arr": "01:05", "arrDate": "2026-06-18", "redeye": true, "block": 350 },
+            { "dir": "in", "date": "2026-06-19", "flight": "KE0656", "from": "BKK", "to": "ICN", "dep": "02:35", "arr": "10:15", "arrDate": "2026-06-19", "redeye": true, "block": 340 }
+          ],
+          "layover": { "city": "방콕", "nights": 1, "from": "2026-06-18", "to": "2026-06-19" }
+        },
+        {
+          "id": "GUM-0621",
+          "category": "short",
+          "region": "대양주",
+          "destination": { "code": "GUM", "city": "괌", "country": "GU" },
+          "start": "2026-06-21",
+          "end": "2026-06-23",
+          "days": 3,
+          "redeye": true,
+          "legs": [
+            { "dir": "out", "date": "2026-06-21", "flight": "KE0417", "from": "ICN", "to": "GUM", "dep": "18:25", "arr": "23:55", "arrDate": "2026-06-21", "redeye": false, "block": 270 },
+            { "dir": "in", "date": "2026-06-23", "flight": "KE0418", "from": "GUM", "to": "ICN", "dep": "02:00", "arr": "05:40", "arrDate": "2026-06-23", "redeye": true, "block": 280 }
+          ],
+          "layover": { "city": "괌", "nights": 2, "from": "2026-06-21", "to": "2026-06-23" }
+        },
+        {
+          "id": "SIN-0628",
+          "category": "mid",
+          "region": "동남아",
+          "destination": { "code": "SIN", "city": "싱가포르", "country": "SG" },
+          "start": "2026-06-28",
+          "end": "2026-07-01",
+          "days": 4,
+          "redeye": true,
+          "legs": [
+            { "dir": "out", "date": "2026-06-28", "flight": "KE0647", "from": "ICN", "to": "SIN", "dep": "23:35", "arr": "05:00", "arrDate": "2026-06-29", "redeye": true, "block": 385 },
+            { "dir": "in", "date": "2026-06-30", "flight": "KE0644", "from": "SIN", "to": "ICN", "dep": "22:00", "arr": "05:35", "arrDate": "2026-07-01", "redeye": true, "block": 395 }
+          ],
+          "layover": { "city": "싱가포르", "nights": 1, "from": "2026-06-29", "to": "2026-06-30" }
+        }
+      ],
+      "offDays": [
+        { "date": "2026-06-01", "code": "ADO" },
+        { "date": "2026-06-06", "code": "ATDO" },
+        { "date": "2026-06-07", "code": "ATDO" },
+        { "date": "2026-06-09", "code": "ADO" },
+        { "date": "2026-06-14", "code": "ATDO" },
+        { "date": "2026-06-15", "code": "ATDO" },
+        { "date": "2026-06-16", "code": "ADO" },
+        { "date": "2026-06-20", "code": "ATDO" },
+        { "date": "2026-06-27", "code": "PDO" }
+      ],
+      "education": [
+        { "date": "2026-06-25", "from": "08:30", "to": "17:30", "place": "ICN" },
+        { "date": "2026-06-26", "from": "08:30", "to": "17:30", "place": "ICN" }
+      ]
+    }
+  ]
 }

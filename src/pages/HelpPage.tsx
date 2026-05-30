@@ -20,23 +20,18 @@ export default function HelpPage({ data }: { data: RosterData }) {
         </p>
       </header>
 
-      <Section title="어떻게 채워지나요" delay="rise-1">
+      <Section title="사진만 주면 끝" delay="rise-1">
         <p className="text-sm leading-relaxed text-[var(--muted)]">
-          이 앱은 <b className="text-[var(--ink)]">스케줄 사진</b>을 올려 데이터를
-          만드는 구조예요. 5월 사진을 올리고, 6월을 올리면 달마다 한 칸씩 쌓여요.
-          쌓인 달은 <b className="text-[var(--ink)]">스케줄</b> 탭에서
-          지난달·이번 달·다음 달로 넘겨 볼 수 있어요.
+          새 스케줄이 나오면 <b className="text-[var(--ink)]">월간 캘린더 사진</b>{" "}
+          한 장을 Claude에게 주기만 하면 돼요. Claude가 사진을 분석해 비행·레이오버·
+          휴무·교육과 <b className="text-[var(--ink)]">총 비행시간</b>까지 계산해서
+          이 앱에 채워 넣어요.
         </p>
-      </Section>
-
-      <Section title="스케줄 올리는 법" delay="rise-2">
-        <ol className="space-y-2.5 text-sm text-[var(--muted)]">
+        <ol className="mt-4 space-y-2.5 text-sm text-[var(--muted)]">
           {[
-            "새 스케줄 캘린더 사진을 준비한다.",
-            "Claude Code(또는 Claude.ai)에 사진과 함께 아래 변환 프롬프트를 준다.",
-            "받은 JSON을 public/schedule.json 의 months 배열에 추가한다.",
-            "커밋 전, 도착 +1일 넘어가는 줄과 야간편(redeye)을 한 번 확인한다.",
-            "main 에 푸시하면 GitHub Pages가 자동 재배포된다."
+            "스케줄 캘린더를 캡처/촬영한다.",
+            "Claude에게 사진을 주며 \"이 스케줄 올려줘\"라고 말한다.",
+            "Claude가 분석해 데이터로 만들고 배포까지 한다. 끝!"
           ].map((t, i) => (
             <li key={i} className="flex gap-3">
               <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/8 text-[11px] font-bold text-sky-300">
@@ -46,17 +41,11 @@ export default function HelpPage({ data }: { data: RosterData }) {
             </li>
           ))}
         </ol>
-        <pre className="mt-4 overflow-x-auto rounded-xl border border-white/8 bg-black/30 p-3 font-mono text-[11px] leading-relaxed text-[var(--muted)]">
-{`첨부한 승무원 월간 스케줄 캘린더 이미지를 규칙대로 JSON 한
-객체(한 달)로만 변환해줘. 설명/코드펜스 없이 JSON만.
-- 비행 블록이 놓인 날짜 칸을 근거로 date/arrDate를 채운다.
-- 도착이 출발보다 이르거나 다음 칸이면 arrDate=+1일.
-- 국내선=domestic, EDU=education, 휴무류=offDays로 분리.
-  국제선은 거리로 long/mid/short 추정.
-- 출발 21:00 이후/야간이면 redeye=true.
-- 편명 KExxxx 유지, 애매하면 null. 공항코드는 IATA 기준.
-결과 객체를 schedule.json 의 months 배열에 넣으면 끝.`}
-        </pre>
+        <p className="mt-4 text-xs leading-relaxed text-[var(--faint)]">
+          5월·6월·7월… 한 장씩 줄 때마다 달이 쌓여요. 쌓인 달은{" "}
+          <b className="text-[var(--muted)]">스케줄</b> 탭에서 지난달·이번 달·
+          다음 달로 넘겨 볼 수 있어요.
+        </p>
       </Section>
 
       <Section title="schedule.json 주소" delay="rise-3">

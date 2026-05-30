@@ -4,6 +4,7 @@ import type { RosterData, Schedule, Trip } from "../types";
 import {
   CATEGORY_META,
   currentMonthKey,
+  fmtDuration,
   kstToday,
   monthKeys,
   monthRhythm,
@@ -142,6 +143,25 @@ function MonthBody({ sched }: { sched: Schedule }) {
 
   return (
     <>
+      <section className="rise rise-1 glass relative overflow-hidden rounded-3xl p-5">
+        <div
+          className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full opacity-25 blur-3xl"
+          style={{ background: "radial-gradient(circle,#5b8def,transparent 70%)" }}
+        />
+        <div className="relative flex items-end justify-between">
+          <div>
+            <p className="eyebrow">총 비행시간</p>
+            <p className="mt-1.5 font-display text-4xl font-extrabold leading-none tracking-tight tnum">
+              {fmtDuration(sum.blockMinutes)}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 pb-1.5 text-sky-300">
+            <PlaneIcon size={18} className="rotate-90" />
+            <span className="font-mono text-sm tnum">{sum.flights} legs</span>
+          </div>
+        </div>
+      </section>
+
       <section className="rise rise-1 grid grid-cols-5 gap-2">
         {stats.map((s) => (
           <div

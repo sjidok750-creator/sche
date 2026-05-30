@@ -138,6 +138,14 @@ export function reportingTime(dep: string | null): string | null {
   return `${hh}:${mm}`;
 }
 
+/** 분 → "92h 25m" */
+export function fmtDuration(min: number): string {
+  if (!min) return "0h";
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
 /** D-day: 양수면 D-n, 0이면 D-DAY */
 export function ddayLabel(target: string, today: string): string {
   const diff = Math.round(
@@ -184,21 +192,25 @@ export interface MonthSummary {
   layoverNights: number;
   offDays: number;
   educationDays: number;
+  blockMinutes: number; // 총 비행시간(분)
 }
 
 export function monthSummary(data: Schedule): MonthSummary {
   let flights = 0;
   let layoverNights = 0;
+  let blockMinutes = 0;
   for (const t of data.trips || []) {
     flights += (t.legs || []).filter((l) => l.flight).length;
     if (t.layover) layoverNights += t.layover.nights;
+    for (const l of t.legs || []) blockMinutes += l.block ?? 0;
   }
   return {
     trips: (data.trips || []).length,
     flights,
     layoverNights,
     offDays: (data.offDays || []).length,
-    educationDays: (data.education || []).length
+    educationDays: (data.education || []).length,
+    blockMinutes
   };
 }
 

@@ -10,6 +10,7 @@ export interface Leg {
   arr: string | null; // local HH:mm
   arrDate: string; // YYYY-MM-DD
   redeye?: boolean;
+  block?: number; // 비행시간(분) — 출도착 시차 반영한 실제 블록타임
 }
 
 export interface Layover {
