@@ -35,8 +35,60 @@ export default function HelpPage({ data }: { data: RosterData }) {
         </ol>
       </Section>
 
+      <OpenRouterSection />
       <GithubSection />
     </div>
+  );
+}
+
+function OpenRouterSection() {
+  const [key, setKey] = useState(Settings.orKey);
+  const [show, setShow] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const save = () => {
+    Settings.orKey = key.trim();
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <Section title="AI 자동 분석 (무료)" delay="rise-2">
+      <p className="mb-3 text-sm text-[var(--muted)]">
+        OpenRouter 무료 키를 입력하면 사진만 올려도 자동 분석돼요 — 하루 200회 무료.{" "}
+        <a
+          href="https://openrouter.ai/keys"
+          target="_blank" rel="noopener noreferrer"
+          className="text-sky-400 underline-offset-2 hover:underline"
+        >
+          키 발급 →
+        </a>
+      </p>
+      <div className="space-y-2">
+        <div className="relative">
+          <input
+            type={show ? "text" : "password"}
+            value={key}
+            onChange={e => setKey(e.target.value)}
+            placeholder="sk-or-…"
+            className="w-full rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2.5 font-mono text-sm text-white placeholder-[var(--faint)] outline-none focus:border-sky-500/40"
+          />
+          <button type="button" onClick={() => setShow(v => !v)}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--faint)] hover:text-[var(--muted)]">
+            {show ? "숨기기" : "보기"}
+          </button>
+        </div>
+        <button onClick={save}
+          className={`w-full rounded-xl py-2.5 text-sm font-semibold transition ${
+            saved ? "bg-emerald-500/20 text-emerald-300" : "bg-sky-500/20 text-sky-300 hover:bg-sky-500/30"
+          }`}>
+          {saved ? "✓ 저장됨" : "저장"}
+        </button>
+      </div>
+      {Settings.isReady() && (
+        <p className="mt-2 text-xs text-emerald-400">✓ AI 자동 분석 활성화됨</p>
+      )}
+    </Section>
   );
 }
 

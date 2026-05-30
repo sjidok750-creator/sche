@@ -21,6 +21,7 @@ import {
   resolveToday
 } from "../lib/schedule";
 import { Settings } from "../lib/settings";
+import { analyzeImage } from "../lib/analyze";
 import { pushScheduleJson } from "../lib/github";
 import {
   ArrowIcon,
@@ -184,12 +185,14 @@ function ScheduleView({ sched, today, monthKey, data, onDataUpdate }: {
 }
 
 /* ─── 업로드 + JSON 붙여넣기 플로우 ─── */
-type Step = "select" | "prompt" | "paste";
+type Step = "select" | "analyzing" | "prompt" | "paste";
 
 interface PhotoItem {
   id: string;
   file: File;
   preview: string;
+  status: "pending" | "analyzing" | "done" | "error";
+  error?: string;
 }
 
 function UploadFlow({ data, onDataUpdate, compact = false }: {
@@ -205,17 +208,56 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
   const [pushState, setPushState] = useState<"idle" | "pushing" | "done" | "error">("idle");
   const [pushErr, setPushErr] = useState("");
 
+  const autoAnalyze = Settings.isReady();
+
+  const commitSchedules = useCallback(async (schedules: Schedule[], baseData: RosterData) => {
+    let updated = baseData;
+    for (const s of schedules) updated = mergeMonth(updated, s);
+    onDataUpdate(updated);
+    if (Settings.canAutoPush()) {
+      setPushState("pushing");
+      try { await pushScheduleJson(updated); setPushState("done"); }
+      catch (e) { setPushErr(e instanceof Error ? e.message : "푸시 실패"); setPushState("error"); }
+    } else {
+      setPushState("done");
+    }
+  }, [onDataUpdate]);
+
   const addFiles = useCallback((files: FileList | File[]) => {
     const arr = Array.from(files).filter(f => f.type.startsWith("image/"));
     if (!arr.length) return;
-    const items = arr.map(file => ({
+    const items: PhotoItem[] = arr.map(file => ({
       id: `${Date.now()}-${Math.random()}`,
       file,
-      preview: URL.createObjectURL(file)
+      preview: URL.createObjectURL(file),
+      status: autoAnalyze ? "analyzing" : "pending"
     }));
     setPhotos(prev => [...prev, ...items]);
-    setStep("prompt");
-  }, []);
+
+    if (autoAnalyze) {
+      setStep("analyzing");
+      const key = Settings.orKey;
+      Promise.all(
+        items.map(item =>
+          analyzeImage(item.file, key)
+            .then(s => ({ item, sched: s, error: null }))
+            .catch(e => ({ item, sched: null, error: e instanceof Error ? e.message : "분석 실패" }))
+        )
+      ).then(results => {
+        setPhotos(prev => prev.map(p => {
+          const r = results.find(r => r.item.id === p.id);
+          if (!r) return p;
+          return { ...p, status: r.error ? "error" : "done", error: r.error ?? undefined };
+        }));
+        const ok = results.filter(r => r.sched).map(r => r.sched!);
+        if (ok.length > 0) commitSchedules(ok, data);
+        setStep("select");
+        setTimeout(() => setPhotos([]), 2000);
+      });
+    } else {
+      setStep("prompt");
+    }
+  }, [autoAnalyze, data, commitSchedules]);
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault(); setIsDrag(false);
@@ -271,6 +313,26 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
     a.download = "schedule.json"; a.click();
   };
 
+  /* ── 자동 분석 중 ── */
+  if (step === "analyzing") return (
+    <div className="space-y-3">
+      <div className="glass rounded-[24px] p-5 space-y-4">
+        <p className="eyebrow text-sky-400">AI 분석 중…</p>
+        {photos.map(p => (
+          <div key={p.id} className="flex items-center gap-3">
+            <img src={p.preview} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-white/15" />
+            <div className="flex-1 min-w-0">
+              <p className="truncate text-sm font-semibold text-[var(--ink)]">{p.file.name}</p>
+              {p.status === "analyzing" && <p className="text-xs text-sky-300 mt-0.5 animate-pulse">분석 중…</p>}
+              {p.status === "done" && <p className="text-xs text-emerald-400 mt-0.5">✓ 완료</p>}
+              {p.status === "error" && <p className="text-xs text-rose-400 mt-0.5 truncate">{p.error}</p>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   /* ── STEP 1: 사진 선택 ── */
   if (step === "select") return (
     <div className="space-y-3">
@@ -310,7 +372,9 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
         {!compact && (
           <div className="text-center">
             <p className="font-display text-lg font-bold tracking-tight">스케줄 사진 올리기</p>
-            <p className="mt-1 text-sm text-[var(--muted)]">여러 달을 한 번에 올려도 돼요</p>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              {autoAnalyze ? "AI가 자동으로 분석해요 · 여러 달 동시 가능" : "여러 달을 한 번에 올려도 돼요"}
+            </p>
           </div>
         )}
         <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-5 py-2 text-sm font-semibold text-sky-300">
