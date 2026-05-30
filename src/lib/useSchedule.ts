@@ -2,6 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import type { RosterData, Schedule } from "../types";
 
 const LS_KEY = "roster_data";
+const RESET_FLAG = "roster_reset_v2";
+
+// 깨진 기존 데이터 일괄 초기화 (이 버전에서 1회)
+try {
+  if (!localStorage.getItem(RESET_FLAG)) {
+    localStorage.removeItem(LS_KEY);
+    localStorage.setItem(RESET_FLAG, "1");
+  }
+} catch { /* ignore */ }
 
 type State =
   | { status: "loading" }

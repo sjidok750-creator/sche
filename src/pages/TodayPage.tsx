@@ -24,7 +24,6 @@ import { Settings } from "../lib/settings";
 import { analyzeImage } from "../lib/analyze";
 import { pushScheduleJson } from "../lib/github";
 import {
-  ArrowIcon,
   CapIcon,
   HotelIcon,
   MoonIcon,
@@ -51,17 +50,6 @@ function useClock(target: Date | null) {
   const pad = (n: number) => String(n).padStart(2, "0");
   return { h: pad(Math.floor(diff / 3600)), m: pad(Math.floor((diff % 3600) / 60)), s: pad(diff % 60), past };
 }
-
-const PROMPT = `이 승무원 월간 스케줄 캘린더를 schedule.json 의 months 배열 한 객체로 변환해줘.
-JSON만 출력 — 코드펜스·설명 없이, 객체 하나만.
-규칙:
-- 이미지 상단에서 연월(YYYY-MM)을 읽어 month 필드에 넣는다.
-- 비행 블록 날짜 칸 기준으로 date/arrDate 채움. 다음 칸 넘어가면 arrDate=+1일.
-- 빈 칸(아무 표시 없음)은 대기 — trips/offDays/education 어디에도 넣지 않음.
-- 국내선(GMP·CJU·PUS·USN·TAE 등)=domestic, EDU=education, ADO/ATDO/PDO/휴무=offDays.
-- 국제선: long(미주·유럽·대양주)/mid(동남아·중동)/short(일본·중국·괌).
-- 출발 21:00 이후면 redeye:true. 편명 KExxxx 유지, 불명확하면 null.
-- leg마다 block(비행시간, 분) 포함. 공항코드는 IATA 표준.`;
 
 function mergeMonth(data: RosterData, sched: Schedule): RosterData {
   const months = data.months.filter((m) => m.month !== sched.month);
@@ -187,157 +175,75 @@ function ScheduleView({ sched, today, monthKey, data, onDataUpdate }: {
   );
 }
 
-/* ─── 업로드 + JSON 붙여넣기 플로우 ─── */
-type Step = "select" | "analyzing" | "prompt" | "paste";
-
-interface PhotoItem {
-  id: string;
-  file: File;
-  preview: string;
-  status: "pending" | "analyzing" | "done" | "error";
-  error?: string;
-}
+/* ─── 업로드 플로우 (연/월 지정 → 한 장 분석) ─── */
+type Step = "select" | "analyzing" | "done";
 
 function UploadFlow({ data, onDataUpdate, compact = false }: {
   data: RosterData; onDataUpdate: (d: RosterData) => void; compact?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const now = new Date();
+  const [year, setYear] = useState(String(now.getFullYear()));
+  const [month, setMonth] = useState(String(now.getMonth() + 1).padStart(2, "0"));
   const [step, setStep] = useState<Step>("select");
-  const [isDrag, setIsDrag] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [jsonText, setJsonText] = useState("");
-  const [parseError, setParseError] = useState("");
-  const [pushState, setPushState] = useState<"idle" | "pushing" | "done" | "error">("idle");
+  const [preview, setPreview] = useState<string>("");
+  const [errMsg, setErrMsg] = useState("");
   const [pushErr, setPushErr] = useState("");
 
-  const autoAnalyze = Settings.isReady();
+  const monthKey = `${year}-${month}`;
+  const hasKey = Settings.isReady();
 
-  const commitSchedules = useCallback(async (schedules: Schedule[], baseData: RosterData) => {
-    let updated = baseData;
-    for (const s of schedules) updated = mergeMonth(updated, s);
-    onDataUpdate(updated);
-    if (Settings.canAutoPush()) {
-      setPushState("pushing");
-      try { await pushScheduleJson(updated); setPushState("done"); }
-      catch (e) { setPushErr(e instanceof Error ? e.message : "푸시 실패"); setPushState("error"); }
-    } else {
-      setPushState("done");
-    }
-  }, [onDataUpdate]);
-
-  const addFiles = useCallback((files: FileList | File[]) => {
-    const arr = Array.from(files).filter(f => f.type.startsWith("image/"));
-    if (!arr.length) return;
-    const items: PhotoItem[] = arr.map(file => ({
-      id: `${Date.now()}-${Math.random()}`,
-      file,
-      preview: URL.createObjectURL(file),
-      status: autoAnalyze ? "analyzing" : "pending"
-    }));
-    setPhotos(prev => [...prev, ...items]);
-
-    if (autoAnalyze) {
-      setStep("analyzing");
-      const key = Settings.anthropicKey;
-      Promise.all(
-        items.map(item =>
-          analyzeImage(item.file, key)
-            .then(s => ({ item, sched: s, error: null as string | null }))
-            .catch(e => ({ item, sched: null, error: e instanceof Error ? e.message : "분석 실패" }))
-        )
-      ).then(results => {
-        setPhotos(prev => prev.map(p => {
-          const r = results.find(r => r.item.id === p.id);
-          if (!r) return p;
-          return { ...p, status: r.error ? "error" : "done", error: r.error ?? undefined };
-        }));
-        const ok = results.filter(r => r.sched).map(r => r.sched!);
-        if (ok.length > 0) commitSchedules(ok, data);
-        // stay on analyzing step to show results; user closes manually
-      });
-    } else {
-      setStep("prompt");
-    }
-  }, [autoAnalyze, data, commitSchedules]);
-
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault(); setIsDrag(false);
-    addFiles(e.dataTransfer.files);
-  };
-
-  const copyPrompt = async () => {
-    await navigator.clipboard.writeText(PROMPT);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
-
-  const applyJson = async () => {
-    setParseError("");
-    // JSON 배열이면 여러 달, 객체면 한 달
-    let parsed: Schedule | Schedule[];
+  const handleFile = useCallback(async (file: File) => {
+    setPreview(URL.createObjectURL(file));
+    setStep("analyzing");
+    setErrMsg(""); setPushErr("");
     try {
-      const clean = jsonText.replace(/^```[a-z]*\n?/m, "").replace(/\n?```$/m, "").trim();
-      parsed = JSON.parse(clean);
-    } catch {
-      setParseError("JSON 형식이 아니에요. Claude 답변에서 JSON 부분만 붙여넣으세요.");
-      return;
-    }
-    const schedules = Array.isArray(parsed) ? parsed : [parsed];
-    let updated = data;
-    for (const s of schedules) {
-      if (!s.month) { setParseError("month 필드가 없어요."); return; }
-      updated = mergeMonth(updated, s);
-    }
-    onDataUpdate(updated);
-
-    // GitHub 자동 푸시
-    if (Settings.canAutoPush()) {
-      setPushState("pushing");
-      try {
-        await pushScheduleJson(updated);
-        setPushState("done");
-      } catch (e) {
-        setPushErr(e instanceof Error ? e.message : "푸시 실패");
-        setPushState("error");
+      const sched = await analyzeImage(file, Settings.anthropicKey);
+      // 사용자가 지정한 연/월로 강제 — AI 오독 방지
+      sched.month = monthKey;
+      const updated = mergeMonth(data, sched);
+      onDataUpdate(updated);
+      if (Settings.canAutoPush()) {
+        try { await pushScheduleJson(updated); }
+        catch (e) { setPushErr(e instanceof Error ? e.message : "GitHub 저장 실패"); }
       }
-    } else {
-      setPushState("done");
+      setStep("done");
+    } catch (e) {
+      setErrMsg(e instanceof Error ? e.message : "분석 실패");
+      setStep("done");
     }
-    setStep("select");
-    setPhotos([]);
-    setJsonText("");
-  };
+  }, [data, monthKey, onDataUpdate]);
 
-  /* ── 자동 분석 중 ── */
-  if (step === "analyzing") {
-    const allDone = photos.every(p => p.status === "done" || p.status === "error");
-    const hasError = photos.some(p => p.status === "error");
+  const years = Array.from({ length: 3 }, (_, i) => now.getFullYear() - 1 + i);
+  const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
+
+  /* ── 분석 중 / 완료 ── */
+  if (step === "analyzing" || step === "done") {
+    const ok = step === "done" && !errMsg;
     return (
       <div className="space-y-3">
         <div className="glass rounded-[24px] p-5 space-y-4">
-          <p className="eyebrow text-sky-400">{allDone ? (hasError ? "분석 완료 (일부 오류)" : "✓ 분석 완료") : "AI 분석 중…"}</p>
-          {photos.map(p => (
-            <div key={p.id} className="flex items-center gap-3">
-              <img src={p.preview} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-white/15" />
-              <div className="flex-1 min-w-0">
-                <p className="truncate text-sm font-semibold text-[var(--ink)]">{p.file.name}</p>
-                {p.status === "analyzing" && <p className="text-xs text-sky-300 mt-0.5 animate-pulse">분석 중…</p>}
-                {p.status === "done" && <p className="text-xs text-emerald-400 mt-0.5">✓ 완료</p>}
-                {p.status === "error" && <p className="text-xs text-rose-400 mt-0.5">{p.error}</p>}
-              </div>
+          <p className="eyebrow text-sky-400">
+            {step === "analyzing" ? `${monthKey.replace("-", ".")} 분석 중…` : ok ? "✓ 분석 완료" : "분석 실패"}
+          </p>
+          <div className="flex items-center gap-3">
+            {preview && <img src={preview} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover ring-1 ring-white/15" />}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-[var(--ink)]">{monthKey.replace("-", ".")} 스케줄</p>
+              {step === "analyzing" && <p className="mt-0.5 text-xs text-sky-300 animate-pulse">AI가 사진을 읽고 있어요…</p>}
+              {ok && <p className="mt-0.5 text-xs text-emerald-400">앱에 반영됐어요</p>}
+              {errMsg && <p className="mt-0.5 break-words text-xs text-rose-400">{errMsg}</p>}
             </div>
-          ))}
-          {allDone && (
+          </div>
+          {pushErr && <p className="text-xs text-amber-400">GitHub 저장 실패: {pushErr} (앱에는 반영됨)</p>}
+          {step === "done" && (
             <button
-              onClick={() => { setPhotos([]); setStep("select"); }}
+              onClick={() => { setStep("select"); setPreview(""); setErrMsg(""); }}
               className={`w-full rounded-xl py-2.5 text-sm font-semibold transition ${
-                hasError
-                  ? "border border-white/10 text-white/70 hover:bg-white/[0.04]"
-                  : "bg-sky-500/20 text-sky-200 hover:bg-sky-500/30"
+                ok ? "bg-sky-500/20 text-sky-200 hover:bg-sky-500/30" : "border border-white/10 text-white/70 hover:bg-white/[0.04]"
               }`}
             >
-              {hasError ? "닫기" : "확인"}
+              {ok ? "확인" : "다시 시도"}
             </button>
           )}
         </div>
@@ -345,136 +251,53 @@ function UploadFlow({ data, onDataUpdate, compact = false }: {
     );
   }
 
-  /* ── STEP 1: 사진 선택 ── */
-  if (step === "select") return (
-    <div className="space-y-3">
-      {pushState === "error" && (
-        <div className="glass rounded-2xl border border-rose-400/20 px-4 py-3">
-          <p className="text-sm font-semibold text-rose-300">GitHub 저장 실패: {pushErr}</p>
+  /* ── 선택 화면: 연/월 지정 + 사진 한 장 ── */
+  return (
+    <div className="space-y-4">
+      {!hasKey && (
+        <div className="glass rounded-2xl border border-amber-400/20 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-300">먼저 API 키가 필요해요</p>
+          <Link to="/help" className="mt-1 inline-block text-xs text-sky-400 hover:text-sky-200">설정 → AI 자동 분석에서 입력 →</Link>
         </div>
       )}
 
+      <div className="glass rounded-[24px] p-5 space-y-4">
+        <div>
+          <p className="eyebrow text-sky-400">어느 달 스케줄인가요?</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">연·월을 정확히 골라주세요. 이 값으로 저장돼요.</p>
+        </div>
+        <div className="flex gap-2">
+          <select value={year} onChange={e => setYear(e.target.value)}
+            className="flex-1 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2.5 text-sm text-white outline-none focus:border-sky-500/40">
+            {years.map(y => <option key={y} value={y} className="bg-slate-900">{y}년</option>)}
+          </select>
+          <select value={month} onChange={e => setMonth(e.target.value)}
+            className="flex-1 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2.5 text-sm text-white outline-none focus:border-sky-500/40">
+            {months.map(m => <option key={m} value={m} className="bg-slate-900">{Number(m)}월</option>)}
+          </select>
+        </div>
+      </div>
+
       <div
-        onClick={() => inputRef.current?.click()}
-        onDragOver={e => { e.preventDefault(); setIsDrag(true); }}
-        onDragLeave={() => setIsDrag(false)}
-        onDrop={onDrop}
-        className={`glass flex flex-col items-center justify-center gap-4 rounded-[24px] border-2 border-dashed cursor-pointer transition-colors ${
-          compact ? "py-8" : "min-h-[18rem]"
-        } ${isDrag ? "border-sky-400/60 bg-sky-400/5" : "border-white/15 hover:border-white/30"}`}
+        onClick={() => hasKey && inputRef.current?.click()}
+        className={`glass flex flex-col items-center justify-center gap-4 rounded-[24px] border-2 border-dashed transition-colors ${
+          compact ? "py-8" : "min-h-[14rem]"
+        } ${hasKey ? "cursor-pointer border-white/15 hover:border-white/30" : "border-white/10 opacity-50"}`}
       >
-        <input ref={inputRef} type="file" accept="image/*" multiple className="sr-only"
-          onChange={e => e.target.files && addFiles(e.target.files)} />
+        <input ref={inputRef} type="file" accept="image/*" className="sr-only"
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
         <div className="grid h-16 w-16 place-items-center rounded-2xl border border-white/10 bg-white/[0.04]">
           <CameraIcon />
         </div>
         {!compact && (
           <div className="text-center">
-            <p className="font-display text-lg font-bold tracking-tight">스케줄 사진 올리기</p>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              {autoAnalyze ? "AI가 자동으로 분석해요 · 여러 달 동시 가능" : "여러 달을 한 번에 올려도 돼요"}
-            </p>
+            <p className="font-display text-lg font-bold tracking-tight">{monthKey.replace("-", ".")} 사진 올리기</p>
+            <p className="mt-1 text-sm text-[var(--muted)]">한 달에 한 장씩 올려주세요</p>
           </div>
         )}
         <span className="rounded-full border border-sky-400/30 bg-sky-400/10 px-5 py-2 text-sm font-semibold text-sky-300">
-          {compact ? "사진 추가" : "사진 선택 (여러 장 가능)"}
+          사진 선택
         </span>
-      </div>
-    </div>
-  );
-
-  /* ── STEP 2: 분석 요청 복사 ── */
-  if (step === "prompt") return (
-    <div className="space-y-3">
-      {/* 미리보기 */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {photos.map(p => (
-          <img key={p.id} src={p.preview} alt="" className="h-24 w-24 shrink-0 rounded-2xl object-cover ring-1 ring-white/20" />
-        ))}
-        <button
-          onClick={() => inputRef.current?.click()}
-          className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border border-dashed border-white/20 text-[var(--faint)] hover:border-white/40"
-        >
-          <span className="text-2xl">+</span>
-        </button>
-        <input ref={inputRef} type="file" accept="image/*" multiple className="sr-only"
-          onChange={e => e.target.files && addFiles(e.target.files)} />
-      </div>
-
-      {/* 안내 카드 */}
-      <div className="glass rounded-[24px] p-5 space-y-4">
-        <div>
-          <p className="eyebrow text-sky-400">2단계로 끝나요</p>
-          <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
-            아래 버튼으로 <b className="text-white">분석 요청을 복사</b>하고,
-            Claude.ai에서 사진과 함께 붙여넣으세요.<br />
-            받은 JSON을 다시 여기에 붙여넣으면 끝이에요.
-          </p>
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={copyPrompt}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition ${
-              copied ? "bg-emerald-500/20 text-emerald-300" : "border border-white/12 bg-white/[0.05] text-white hover:bg-white/[0.09]"
-            }`}
-          >
-            {copied ? "✓ 복사됨" : "① 분석 요청 복사"}
-          </button>
-          <a
-            href="https://claude.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/15 py-3 text-sm font-semibold text-sky-200 hover:bg-sky-500/25 transition"
-          >
-            ② Claude.ai 열기 <ArrowIcon size={15} />
-          </a>
-        </div>
-
-        <button
-          onClick={() => setStep("paste")}
-          className="w-full rounded-xl border border-white/10 py-3 text-sm font-semibold text-white/70 hover:bg-white/[0.04] transition"
-        >
-          ③ JSON 받았어요 →
-        </button>
-      </div>
-
-      <button onClick={() => { setPhotos([]); setStep("select"); }}
-        className="w-full py-2 text-xs text-[var(--faint)] hover:text-[var(--muted)]">
-        취소
-      </button>
-    </div>
-  );
-
-  /* ── STEP 3: JSON 붙여넣기 ── */
-  return (
-    <div className="space-y-3">
-      <div className="glass rounded-[24px] p-5 space-y-3">
-        <p className="eyebrow text-sky-400">③ JSON 붙여넣기</p>
-        <p className="text-sm text-[var(--muted)]">Claude 답변의 JSON을 아래에 붙여넣으세요.</p>
-        <textarea
-          value={jsonText}
-          onChange={e => { setJsonText(e.target.value); setParseError(""); }}
-          placeholder={'{\n  "month": "2026-06",\n  ...\n}'}
-          rows={8}
-          className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 font-mono text-xs text-[var(--muted)] placeholder-[var(--faint)] outline-none focus:border-sky-500/40 resize-none"
-        />
-        {parseError && <p className="text-xs text-rose-400">{parseError}</p>}
-        <div className="flex gap-2">
-          <button
-            onClick={() => setStep("prompt")}
-            className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-[var(--faint)] hover:text-white transition"
-          >
-            ← 뒤로
-          </button>
-          <button
-            onClick={applyJson}
-            disabled={!jsonText.trim()}
-            className="flex-1 rounded-xl bg-sky-500/20 py-2.5 text-sm font-semibold text-sky-200 hover:bg-sky-500/30 disabled:opacity-30 transition"
-          >
-            {pushState === "pushing" ? "저장 중…" : "적용하기"}
-          </button>
-        </div>
       </div>
     </div>
   );
