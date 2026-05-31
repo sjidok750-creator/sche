@@ -2,8 +2,9 @@ import { useState, type ReactNode } from "react";
 import type { RosterData } from "../types";
 import { monthKeys } from "../lib/schedule";
 import { Settings } from "../lib/settings";
+import { pushScheduleJson } from "../lib/github";
 
-export default function HelpPage({ data }: { data: RosterData }) {
+export default function HelpPage({ data, onDataUpdate }: { data: RosterData; onDataUpdate?: (d: RosterData) => void }) {
   const keys = monthKeys(data);
   return (
     <div className="space-y-6">
@@ -37,28 +38,78 @@ export default function HelpPage({ data }: { data: RosterData }) {
 
       <OpenRouterSection />
       <GithubSection />
-      <DataSection data={data} />
+      <DataSection data={data} onDataUpdate={onDataUpdate} />
     </div>
   );
 }
 
-function DataSection({ data }: { data: RosterData }) {
+function DataSection({ data, onDataUpdate }: { data: RosterData; onDataUpdate?: (d: RosterData) => void }) {
   const [open, setOpen] = useState(false);
-  const reset = () => {
-    if (!confirm("저장된 스케줄 데이터를 모두 지울까요?")) return;
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const keys = monthKeys(data);
+
+  const deleteMonth = async (month: string) => {
+    if (!confirm(`${month.replace("-", ".")} 스케줄을 지울까요?\n해당 달만 삭제되고 다시 분석할 수 있어요.`)) return;
+    const updated: RosterData = { months: data.months.filter(m => m.month !== month) };
+    setBusy(month);
+    setMsg(null);
+    onDataUpdate?.(updated);
+    // GitHub 자동저장이 켜져 있으면 위젯에도 반영
+    if (Settings.canAutoPush()) {
+      try {
+        await pushScheduleJson(updated);
+        setMsg(`${month.replace("-", ".")} 삭제됨 · GitHub 반영 완료`);
+      } catch (e) {
+        setMsg(`${month.replace("-", ".")} 삭제됨 (GitHub 반영 실패: ${(e as Error).message})`);
+      }
+    } else {
+      setMsg(`${month.replace("-", ".")} 삭제됨`);
+    }
+    setBusy(null);
+  };
+
+  const resetAll = () => {
+    if (!confirm("저장된 모든 달의 스케줄을 지울까요?")) return;
     try { localStorage.removeItem("roster_data"); } catch { /* ignore */ }
     location.reload();
   };
+
   return (
     <Section title="진단 · 데이터" delay="rise-3">
-      <div className="flex gap-2">
+      {keys.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs text-[var(--muted)]">
+            잘못 분석된 달은 지운 뒤 홈 탭에서 다시 분석하세요.
+          </p>
+          <ul className="space-y-1.5">
+            {keys.map(k => (
+              <li key={k} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                <span className="text-sm font-semibold text-[var(--ink)]">{k.replace("-", ".")}</span>
+                <button
+                  onClick={() => deleteMonth(k)}
+                  disabled={busy === k}
+                  className="rounded-lg bg-rose-500/20 px-3 py-1.5 text-xs font-semibold text-rose-200 hover:bg-rose-500/30 disabled:opacity-50">
+                  {busy === k ? "삭제 중…" : "이 달 삭제"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="text-sm text-[var(--muted)]">등록된 스케줄이 없어요.</p>
+      )}
+
+      {msg && <p className="mt-2 text-xs text-emerald-400">{msg}</p>}
+
+      <div className="mt-4 flex gap-2">
         <button onClick={() => setOpen(v => !v)}
           className="flex-1 rounded-xl border border-white/10 py-2.5 text-sm font-semibold text-white/70 hover:bg-white/[0.04]">
           {open ? "데이터 숨기기" : "저장된 데이터 보기"}
         </button>
-        <button onClick={reset}
+        <button onClick={resetAll}
           className="flex-1 rounded-xl bg-rose-500/20 py-2.5 text-sm font-semibold text-rose-200 hover:bg-rose-500/30">
-          데이터 초기화
+          전체 초기화
         </button>
       </div>
       {open && (
