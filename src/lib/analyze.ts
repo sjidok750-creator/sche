@@ -55,7 +55,7 @@ function buildPrompt(yearMonth: string): string {
 1. 모든 날짜는 반드시 YYYY-MM-DD 전체 형식 — "${y}-${m}-01" 처럼.
 2. category: domestic=국내선(GMP/CJU/PUS/USN/TAE), long=미주·유럽·대양주, mid=동남아·중동·남아시아, short=일본·중국·괌·하와이
 3. 레이오버 구간: 출발 leg dir="out", 귀국 leg dir="in". 두 leg 사이 날짜는 trip의 start~end에 포함.
-4. 다음날 도착이면 arrDate = 출발일+1일.
+4. arrDate는 반드시 실제 도착 날짜. 야간비행(자정 넘어 도착)은 출발일+1일. 귀국편이 다음날 도착이면 반드시 다음날 날짜로 기입.
 5. 출발 21:00 이후면 redeye=true.
 6. 빈 칸(표시 없음)은 대기 — trips/offDays/education에 넣지 않음.
 7. EDU = education. ADO/ATDO/PDO/휴무 = offDays.
@@ -121,7 +121,16 @@ function postProcess(sched: Schedule, yearMonth: string): Schedule {
       const from = (l.from || "ICN").toUpperCase();
       const to = (l.to || "").toUpperCase();
       const date = fixDate(l.date);
-      const arrDate = fixDate(l.arrDate) || date;
+      let arrDate = fixDate(l.arrDate) || date;
+      // arrDate가 date와 같은데 야간비행(arr < dep 또는 redeye)이면 +1일로 보정
+      if (arrDate === date && l.dep && l.arr) {
+        const dm = toMin(l.dep), am = toMin(l.arr);
+        if (dm != null && am != null && am < dm) {
+          const d = new Date(`${date}T00:00:00Z`);
+          d.setUTCDate(d.getUTCDate() + 1);
+          arrDate = d.toISOString().slice(0, 10);
+        }
+      }
       // block이 없거나 0이면 시각·시차로 계산
       const block = (l.block && l.block > 0)
         ? l.block
@@ -139,14 +148,15 @@ function postProcess(sched: Schedule, yearMonth: string): Schedule {
     const end   = fixDate(t.end)   || dates[dates.length - 1] || start;
 
     // 레이오버 박수는 AI값 무시하고 항상 재계산
-    // 도착일(out leg arrDate) ~ 귀국 출발일(in leg date) 차이 = 실제 숙박 박수
+    // 귀국 도착일(in leg arrDate) - 현지 도착일(out leg arrDate) = 집 떠난 총 박수
     const outLeg = legs.find(l => l.dir === "out");
     const inLeg = legs.find(l => l.dir === "in");
     let layover = undefined as Trip["layover"];
     if (outLeg && inLeg && category !== "domestic") {
       const arrivedDay = outLeg.arrDate || outLeg.date;
+      const returnedDay = inLeg.arrDate || inLeg.date;
       const nights = Math.round(
-        (new Date(`${inLeg.date}T00:00:00Z`).getTime() - new Date(`${arrivedDay}T00:00:00Z`).getTime()) / 86400000
+        (new Date(`${returnedDay}T00:00:00Z`).getTime() - new Date(`${arrivedDay}T00:00:00Z`).getTime()) / 86400000
       );
       if (nights >= 1) {
         layover = {
